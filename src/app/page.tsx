@@ -44,6 +44,30 @@ const DEPTHS: { id: Depth; label: string }[] = [
 type AnyResult = LookupResult | IpLookupResult;
 type HistoryEntry = AnyResult & { queriedAt: string };
 
+// ---------------------------------------------------------------------------
+// localStorage helpers — safe in SSR / try-catch guarded
+// ---------------------------------------------------------------------------
+
+const HISTORY_KEY = "phonescan_history";
+
+function loadHistory(): HistoryEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : [];
+  } catch { return []; }
+}
+
+function saveHistory(entries: HistoryEntry[]): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(entries)); } catch {}
+}
+
+function clearHistory(): void {
+  if (typeof window === "undefined") return;
+  try { localStorage.removeItem(HISTORY_KEY); } catch {}
+}
+
 type FlagSeverity = "danger" | "warning" | "safe" | "info";
 
 const DANGER_WORDS = [
@@ -589,14 +613,41 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
 // History
 // ---------------------------------------------------------------------------
 
-function HistoryPanel({ history, onReplay }: { history: HistoryEntry[]; onReplay: (n: string) => void }) {
+function HistoryPanel({
+  history,
+  onRestore,
+  onClear,
+}: {
+  history: HistoryEntry[];
+  onRestore: (entry: HistoryEntry) => void;
+  onClear: () => void;
+}) {
+  const [cleared, setCleared] = useState(false);
+
   if (history.length === 0) return null;
+
+  function handleClear() {
+    onClear();
+    setCleared(true);
+    setTimeout(() => setCleared(false), 2000);
+  }
+
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
-      <div className="px-5 py-3 border-b border-[var(--border)]">
+      <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
         <span className="font-mono text-[10px] tracking-[3px] text-[var(--muted)]">
           {"// RECENT LOOKUPS ("}{history.length}{")"}
         </span>
+        <button
+          onClick={handleClear}
+          className={`font-mono text-[9px] tracking-[2px] px-2.5 py-1 border rounded-sm transition-all ${
+            cleared
+              ? "border-[var(--accent)] text-[var(--accent)]"
+              : "border-[var(--border)] text-[var(--muted)] hover:border-[#ff3c5a] hover:text-[#ff3c5a]"
+          }`}
+        >
+          {cleared ? "✓ CLEARED" : "CLEAR"}
+        </button>
       </div>
       <div className="divide-y divide-[var(--border)]">
         {history.map((entry, i) => {
@@ -605,21 +656,21 @@ function HistoryPanel({ history, onReplay }: { history: HistoryEntry[]; onReplay
           const displayVal = isIp
             ? (entry as IpLookupResult).ip
             : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
-          const raw = isIp ? (entry as IpLookupResult).ip : (entry as LookupResult).parsed.raw;
+          const modeLabel = isIp ? "IP" : (entry as LookupResult).mode.toUpperCase();
+          const icon = isIp ? "🌐" : "📞";
           return (
             <button
               key={i}
-              onClick={() => onReplay(raw)}
+              onClick={() => onRestore(entry)}
               className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-[#0d1117] transition-colors text-left group"
             >
-              <div className="flex items-center gap-3 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
                 <span className="font-mono text-[10px] text-[var(--muted)]">{String(i + 1).padStart(2, "0")}</span>
+                <span className="text-sm leading-none shrink-0">{icon}</span>
                 <span className={`font-mono text-[13px] tracking-wide group-hover:text-[var(--accent)] transition-colors truncate ${rc.text}`}>
                   {displayVal}
                 </span>
-                <span className="font-mono text-[10px] text-[var(--muted)] shrink-0">
-                  {isIp ? "IP" : (entry as LookupResult).mode.toUpperCase()}
-                </span>
+                <span className="font-mono text-[10px] text-[var(--muted)] shrink-0">{modeLabel}</span>
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className={`font-mono text-[10px] tracking-[2px] px-2 py-0.5 border rounded-sm ${rc.text} ${rc.border}`}>
@@ -652,6 +703,9 @@ export default function Home() {
   const myIpRef        = useRef<string | null>(null);
   const hasAutoRunRef  = useRef(false);
 
+  // Load history from localStorage after mount (avoids SSR hydration mismatch)
+  useEffect(() => { setHistory(loadHistory()); }, []);
+
   const lookup = useCallback(async (raw?: string) => {
     const target = (raw ?? number).trim();
     if (!target) return;
@@ -683,7 +737,11 @@ export default function Home() {
         return;
       }
       setResult(data);
-      setHistory(prev => [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
+      setHistory(prev => {
+        const updated = [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 20);
+        saveHistory(updated);
+        return updated;
+      });
     } catch {
       setError("Network error — check your connection and try again.");
     } finally {
@@ -699,6 +757,29 @@ export default function Home() {
     } catch {
       setError("Could not detect your IP address.");
     }
+  }, []);
+
+  // Restore a history entry directly — no re-fetch
+  const handleRestore = useCallback((entry: HistoryEntry) => {
+    const isIp = "ip" in entry;
+    setResult(entry);
+    setError(null);
+    if (isIp) {
+      const ipEntry = entry as IpLookupResult;
+      setMode("red");
+      setNumber(ipEntry.original_input ?? ipEntry.ip);
+    } else {
+      const phoneEntry = entry as LookupResult;
+      setMode(phoneEntry.mode);
+      setNumber(phoneEntry.parsed.raw);
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  // Clear history from state + localStorage
+  const handleClearHistory = useCallback(() => {
+    setHistory([]);
+    clearHistory();
   }, []);
 
   // Silently detect user's IP on mount for auto-fill later
@@ -944,7 +1025,7 @@ export default function Home() {
       {/* History */}
       {history.length > 0 && (
         <div className="w-full max-w-[700px] mt-6">
-          <HistoryPanel history={history} onReplay={n => { setNumber(n); lookup(n); }} />
+          <HistoryPanel history={history} onRestore={handleRestore} onClear={handleClearHistory} />
         </div>
       )}
 
