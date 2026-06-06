@@ -113,14 +113,14 @@ function flagEmoji(countryCode: string | null): string {
     .join("");
 }
 
-function isValidIp(s: string): boolean {
-  const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
-  const ipv6 = /^[0-9a-fA-F:]{2,45}$/;
-  return ipv4.test(s) || ipv6.test(s);
-}
-
-function isValidDomain(s: string): boolean {
-  return /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$/.test(s);
+function isValidIpOrDomain(s: string): boolean {
+  // IPv4
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(s)) return true;
+  // IPv6
+  if (/^[0-9a-fA-F:]{2,45}$/.test(s)) return true;
+  // Domain — letters, digits, dots, hyphens, at least one char
+  if (/^[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}[a-zA-Z0-9]$/.test(s)) return true;
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -711,7 +711,7 @@ export default function Home() {
     if (!target) return;
 
     // IP mode validation — accept IPs and domain names
-    if (mode === "red" && !isValidIp(target) && !isValidDomain(target)) {
+    if (mode === "red" && !isValidIpOrDomain(target)) {
       setError("Invalid input. Enter a valid IP address (e.g. 8.8.8.8) or domain (e.g. google.com).");
       return;
     }
