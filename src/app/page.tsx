@@ -51,22 +51,51 @@ function riskDot(risk: RiskLevel): string {
   }
 }
 
-function flagSeverityClass(flag: string): string {
+type FlagSeverity = "danger" | "warning" | "safe";
+
+const DANGER_WORDS = [
+  "scam", "fraud", "malicious", "reported", "dangerous", "illegal",
+  "phishing", "vishing", "smishing", "blacklist", "blacklisted",
+  "criminal", "threatening", "extortion", "impersonat",
+];
+const WARNING_WORDS = [
+  "premium", "voip", "unknown", "unverified", "spoofable", "caution",
+  "potential", "risk", "suspicious", "unconfirmed", "questionable",
+  "unusual", "offshore", "anonymous", "untraceable",
+];
+
+function classifyFlag(flag: string): FlagSeverity {
   const lower = flag.toLowerCase();
-  if (
-    lower.includes("high") || lower.includes("scam") ||
-    lower.includes("fraud") || lower.includes("malicious")
-  ) {
-    return "text-red-400 border-red-400/20 bg-red-400/5";
-  }
-  if (
-    lower.includes("medium") || lower.includes("suspicious") ||
-    lower.includes("unknown") || lower.includes("unverified")
-  ) {
-    return "text-orange-400 border-orange-400/20 bg-orange-400/5";
-  }
-  return "text-slate-300 border-slate-600/40 bg-slate-800/40";
+  if (DANGER_WORDS.some(w => lower.includes(w)))  return "danger";
+  if (WARNING_WORDS.some(w => lower.includes(w))) return "warning";
+  return "safe";
 }
+
+const FLAG_STYLES: Record<FlagSeverity, {
+  wrapper: string;
+  icon: string;
+  iconColor: string;
+  label: string;
+}> = {
+  danger: {
+    wrapper: "border-l-2 border-l-red-500 border border-red-500/20 bg-red-500/10 text-red-300",
+    icon: "⚠",
+    iconColor: "text-red-400",
+    label: "danger",
+  },
+  warning: {
+    wrapper: "border-l-2 border-l-amber-400 border border-amber-400/20 bg-amber-400/10 text-amber-200",
+    icon: "⚡",
+    iconColor: "text-amber-400",
+    label: "warning",
+  },
+  safe: {
+    wrapper: "border-l-2 border-l-emerald-500 border border-emerald-500/15 bg-emerald-500/5 text-emerald-300",
+    icon: "✓",
+    iconColor: "text-emerald-400",
+    label: "safe",
+  },
+};
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -138,17 +167,24 @@ function ResultCard({ result }: { result: LookupResult }) {
               Intelligence Flags
             </div>
             <div className="space-y-1.5">
-              {result.flags.map((flag, i) => (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 px-3 py-2 rounded border text-xs leading-relaxed ${flagSeverityClass(flag)}`}
-                >
-                  <span className="mt-0.5 shrink-0 font-mono-num text-[10px] opacity-50">
-                    {String(i + 1).padStart(2, "0")}
-                  </span>
-                  {flag}
-                </div>
-              ))}
+              {result.flags.map((flag, i) => {
+                const severity = classifyFlag(flag);
+                const style = FLAG_STYLES[severity];
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2.5 px-3 py-2.5 rounded-r-lg text-xs leading-relaxed ${style.wrapper}`}
+                  >
+                    <span className={`shrink-0 text-sm leading-none mt-px font-bold ${style.iconColor}`}>
+                      {style.icon}
+                    </span>
+                    <span className="flex-1">{flag}</span>
+                    <span className={`shrink-0 self-center font-mono-num text-[9px] uppercase tracking-widest opacity-40 ${style.iconColor}`}>
+                      {style.label}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
