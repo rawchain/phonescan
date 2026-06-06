@@ -43,15 +43,28 @@ export interface IpLookupResult {
   lat: number | null;
   lon: number | null;
   timezone: string | null;
+  // Anonymisation flags
   is_proxy: boolean;
   is_vpn: boolean;
   is_hosting: boolean;
   is_tor: boolean;
-  threat_score: number | null; // 0–100 (from GetIPIntel × 100)
+  // GetIPIntel
+  threat_score: number | null; // 0–100
+  // AbuseIPDB
+  abuse_confidence_score: number | null; // 0–100
+  abuse_total_reports: number | null;
+  abuse_last_reported: string | null;
+  abuse_usage_type: string | null;
+  // Reverse DNS + WHOIS
+  reverse_dns: string | null;
+  whois_org: string | null;
+  whois_network_name: string | null;
+  whois_abuse_email: string | null;
+  // AI
   risk: RiskLevel;
   summary: string;
   flags: string[];
-  raw: string; // raw AI text
+  raw: string;
   depth: Depth;
 }
 

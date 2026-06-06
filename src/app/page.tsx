@@ -307,23 +307,21 @@ function ResultCard({ result }: { result: LookupResult }) {
 // IP result card
 // ---------------------------------------------------------------------------
 
-function ThreatBar({ score }: { score: number | null }) {
+function ScoreBar({ label, score, lowGood }: { label: string; score: number | null; lowGood?: boolean }) {
   if (score === null) return null;
   const pct = Math.min(100, Math.max(0, score));
-  const colour = pct >= 61 ? "#ff3c5a" : pct >= 31 ? "#ffb800" : "#00ff88";
+  const colour = lowGood
+    ? (pct <= 20 ? "#00ff88" : pct <= 60 ? "#ffb800" : "#ff3c5a")
+    : (pct >= 61 ? "#ff3c5a" : pct >= 31 ? "#ffb800" : "#00ff88");
   return (
     <div>
       <div className="flex justify-between mb-1.5">
-        <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] uppercase">Threat Score</span>
-        <span className="font-mono text-[11px] tracking-[1px]" style={{ color: colour }}>
-          {score}/100
-        </span>
+        <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] uppercase">{label}</span>
+        <span className="font-mono text-[11px] tracking-[1px]" style={{ color: colour }}>{score}/100</span>
       </div>
       <div className="h-[6px] bg-[#070910] rounded-full border border-[var(--border)] overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: colour, boxShadow: `0 0 6px ${colour}` }}
-        />
+        <div className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, background: colour, boxShadow: `0 0 6px ${colour}` }} />
       </div>
       <div className="flex justify-between mt-1">
         <span className="font-mono text-[9px] text-[var(--muted)]">CLEAN</span>
@@ -336,10 +334,10 @@ function ThreatBar({ score }: { score: number | null }) {
 function IndicatorPill({ label, active, colour }: { label: string; active: boolean; colour: string }) {
   return (
     <div
-      className={`font-mono text-[10px] tracking-[2px] px-3 py-1.5 border rounded-sm transition-all ${
-        active ? "" : "opacity-30"
-      }`}
-      style={active ? { borderColor: `${colour}55`, background: `${colour}12`, color: colour } : { borderColor: "var(--border)", color: "var(--muted)" }}
+      className={`font-mono text-[10px] tracking-[2px] px-3 py-1.5 border rounded-sm transition-all ${active ? "" : "opacity-25"}`}
+      style={active
+        ? { borderColor: `${colour}55`, background: `${colour}12`, color: colour }
+        : { borderColor: "var(--border)", color: "var(--muted)" }}
     >
       {active ? "● " : "○ "}{label}
     </div>
@@ -355,36 +353,38 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
     [
       "PhoneScan IP Report",
       `${result.ip} — ${result.risk} Risk`,
-      result.summary,
-      "",
+      result.summary, "",
       `Location: ${locationStr}`,
-      result.isp    ? `ISP: ${result.isp}` : null,
-      result.asn    ? `ASN: ${result.asn}` : null,
+      result.reverse_dns    ? `Reverse DNS: ${result.reverse_dns}` : null,
+      result.isp            ? `ISP: ${result.isp}` : null,
+      result.asn            ? `ASN: ${result.asn}` : null,
+      result.whois_org      ? `WHOIS Org: ${result.whois_org}` : null,
       `VPN: ${result.is_vpn} | Proxy: ${result.is_proxy} | Tor: ${result.is_tor} | Hosting: ${result.is_hosting}`,
-      result.threat_score !== null ? `Threat Score: ${result.threat_score}/100` : null,
-      "",
-      "Findings:",
-      ...result.flags.map(f => `• ${f}`),
-      "",
-      "Analysis:",
-      result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
+      result.abuse_confidence_score != null ? `AbuseIPDB: ${result.abuse_confidence_score}/100 (${result.abuse_total_reports} reports)` : null,
+      result.threat_score !== null  ? `GetIPIntel Threat: ${result.threat_score}/100` : null,
+      "", "Findings:", ...result.flags.map(f => `• ${f}`),
+      "", "Analysis:", result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
     ].filter(s => s !== null).join("\n"),
-    [result]
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const getShare = useCallback(() =>
     `${result.ip} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
-    [result]
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const metaItems = [
-    { label: "IP ADDRESS", value: result.ip },
-    { label: "COUNTRY",    value: result.country ?? "—" },
-    { label: "CITY",       value: result.city ?? "—" },
-    { label: "REGION",     value: result.region ?? "—" },
-    { label: "ISP",        value: result.isp ?? "—" },
-    { label: "ASN",        value: result.asn ?? "—" },
-    { label: "TIMEZONE",   value: result.timezone ?? "—" },
-    { label: "DEPTH",      value: result.depth.toUpperCase() },
+    { label: "IP ADDRESS",    value: result.ip },
+    { label: "COUNTRY",       value: result.country ?? "—" },
+    { label: "CITY",          value: result.city ?? "—" },
+    { label: "REGION",        value: result.region ?? "—" },
+    { label: "ISP",           value: result.isp ?? "—" },
+    { label: "ASN",           value: result.asn ?? "—" },
+    { label: "WHOIS ORG",     value: result.whois_org ?? "—" },
+    { label: "NETWORK",       value: result.whois_network_name ?? "—" },
+    { label: "TIMEZONE",      value: result.timezone ?? "—" },
+    { label: "USAGE TYPE",    value: result.abuse_usage_type ?? "—" },
+    { label: "ABUSE REPORTS", value: result.abuse_total_reports != null ? String(result.abuse_total_reports) : "—" },
+    { label: "DEPTH",         value: result.depth.toUpperCase() },
   ];
 
   return (
@@ -395,12 +395,17 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
               IP ANALYSIS COMPLETE
-              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">ip-api · ipapi.is · groq</span>
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">
+                ip-api · ipapi.is · abuseipdb · greynoise · groq
+              </span>
             </div>
             <div className="font-mono text-xl text-white tracking-[2px] break-all">{result.ip}</div>
-            <div className="font-mono text-[12px] text-[var(--muted)] mt-1">
-              {flag} {locationStr}
-            </div>
+            {result.reverse_dns && (
+              <div className="font-mono text-[11px] text-[var(--accent)] opacity-70 mt-0.5 break-all">
+                ↳ {result.reverse_dns}
+              </div>
+            )}
+            <div className="font-mono text-[12px] text-[var(--muted)] mt-1">{flag} {locationStr}</div>
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <CopyBtn label="COPY"  getText={getReport} />
@@ -410,6 +415,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
       </div>
 
       <div className="px-6 py-5 space-y-5">
+
         {/* Risk banner */}
         <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
           <span className="text-3xl leading-none">{rc.icon}</span>
@@ -425,31 +431,52 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] px-4 py-2 border-b border-[var(--border)] bg-[#070910]">
               {"// APPROXIMATE LOCATION · "}{result.city ?? "UNKNOWN"}{result.region ? `, ${result.region}` : ""}{result.country ? ` · ${result.country}` : ""}
             </div>
-            <IpMap
-              lat={result.lat}
-              lon={result.lon}
-              city={result.city}
-              region={result.region}
-              country={result.country}
-            />
+            <IpMap lat={result.lat} lon={result.lon} city={result.city} region={result.region} country={result.country} />
           </div>
         )}
 
-        {/* Anonymisation indicators */}
+        {/* Reputation pills */}
         <div>
-          <SectionLabel>ANONYMISATION DETECTION</SectionLabel>
+          <SectionLabel>REPUTATION SIGNALS</SectionLabel>
           <div className="flex flex-wrap gap-2">
-            <IndicatorPill label="VPN"            active={result.is_vpn}     colour="#ffb800" />
-            <IndicatorPill label="PROXY"          active={result.is_proxy}   colour="#ffb800" />
-            <IndicatorPill label="TOR EXIT NODE"  active={result.is_tor}     colour="#ff3c5a" />
-            <IndicatorPill label="HOSTING / DC"   active={result.is_hosting} colour="#6496ff" />
+            <IndicatorPill label="VPN"           active={result.is_vpn}           colour="#ffb800" />
+            <IndicatorPill label="PROXY"         active={result.is_proxy}         colour="#ffb800" />
+            <IndicatorPill label="TOR"           active={result.is_tor}           colour="#ff3c5a" />
+            <IndicatorPill label="HOSTING / DC"  active={result.is_hosting}       colour="#6496ff" />
           </div>
         </div>
 
-        {/* Threat score */}
-        {result.threat_score !== null && (
-          <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3.5">
-            <ThreatBar score={result.threat_score} />
+        {/* Score bars */}
+        {(result.abuse_confidence_score !== null || result.threat_score !== null) && (
+          <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-4 space-y-4">
+            {result.abuse_confidence_score !== null && (
+              <div>
+                <ScoreBar label="AbuseIPDB Confidence" score={result.abuse_confidence_score} lowGood />
+                <div className="flex gap-4 mt-2 flex-wrap">
+                  {result.abuse_total_reports != null && (
+                    <span className="font-mono text-[10px] text-[var(--muted)]">
+                      {result.abuse_total_reports} reports
+                    </span>
+                  )}
+                  {result.abuse_last_reported && (
+                    <span className="font-mono text-[10px] text-[var(--muted)]">
+                      last: {new Date(result.abuse_last_reported).toLocaleDateString()}
+                    </span>
+                  )}
+                  {result.whois_abuse_email && (
+                    <a
+                      href={`mailto:${result.whois_abuse_email}`}
+                      className="font-mono text-[10px] text-[var(--accent)] opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      abuse: {result.whois_abuse_email}
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            {result.threat_score !== null && (
+              <ScoreBar label="GetIPIntel Threat Score" score={result.threat_score} lowGood />
+            )}
           </div>
         )}
 
@@ -536,7 +563,9 @@ export default function Home() {
   const [error,     setError]     = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [history,   setHistory]   = useState<HistoryEntry[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef       = useRef<HTMLInputElement>(null);
+  const myIpRef        = useRef<string | null>(null);
+  const hasAutoRunRef  = useRef(false);
 
   const lookup = useCallback(async (raw?: string) => {
     const target = (raw ?? number).trim();
@@ -586,6 +615,25 @@ export default function Home() {
       setError("Could not detect your IP address.");
     }
   }, []);
+
+  // Silently detect user's IP on mount for auto-fill later
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json")
+      .then(r => r.json())
+      .then(({ ip }: { ip: string }) => { myIpRef.current = ip; })
+      .catch(() => {});
+  }, []);
+
+  // Auto-fill + auto-run when user first switches to IP mode with empty input
+  useEffect(() => {
+    if (mode === "red" && !number && myIpRef.current && !hasAutoRunRef.current) {
+      hasAutoRunRef.current = true;
+      const ip = myIpRef.current;
+      setNumber(ip);
+      lookup(ip);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
