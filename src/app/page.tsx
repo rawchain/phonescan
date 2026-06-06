@@ -15,17 +15,51 @@ const EXAMPLE_NUMBERS = [
   { label: "+49 30 12345678", number: "+493012345678", note: "Berlin" },
 ];
 
-const MODES: { id: Mode; label: string; emoji: string; desc: string }[] = [
-  { id: "consumer", label: "Scam Check", emoji: "🛡️", desc: "Plain-language safety verdict for everyday callers" },
-  { id: "blue", label: "Blue Team", emoji: "🔵", desc: "Defensive SOC analysis with TTPs and controls" },
-  { id: "red", label: "Red Team", emoji: "🔴", desc: "OSINT deep-dive with attribution and intel value" },
+const MODES: { id: Mode; label: string; desc: string; icon: React.ReactNode }[] = [
+  {
+    id: "consumer",
+    label: "Scam Check",
+    desc: "Plain-language safety verdict for everyday callers",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+      </svg>
+    ),
+  },
+  {
+    id: "blue",
+    label: "Blue Team",
+    desc: "Defensive SOC analysis with TTPs and controls",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    id: "red",
+    label: "Red Team",
+    desc: "OSINT deep-dive with attribution and intel value",
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
+      </svg>
+    ),
+  },
 ];
 
 const DEPTHS: { id: Depth; label: string; desc: string }[] = [
-  { id: "quick", label: "Quick", desc: "3-sentence verdict" },
-  { id: "standard", label: "Standard", desc: "Structured sections" },
-  { id: "deep", label: "Deep OSINT", desc: "Full intel report" },
+  { id: "quick",    label: "Quick",     desc: "3-sentence verdict" },
+  { id: "standard", label: "Standard",  desc: "Structured sections" },
+  { id: "deep",     label: "Deep OSINT", desc: "Full intel report" },
 ];
+
+const MODE_COLOURS: Record<Mode, { active: string; icon: string }> = {
+  consumer: { active: "border-indigo-500/60 bg-indigo-500/10 shadow-[0_0_24px_rgba(99,102,241,0.12)]", icon: "text-indigo-400 bg-indigo-500/15 border-indigo-500/25" },
+  blue:     { active: "border-blue-500/60 bg-blue-500/10 shadow-[0_0_24px_rgba(59,130,246,0.12)]",   icon: "text-blue-400 bg-blue-500/15 border-blue-500/25" },
+  red:      { active: "border-rose-500/60 bg-rose-500/10 shadow-[0_0_24px_rgba(244,63,94,0.12)]",    icon: "text-rose-400 bg-rose-500/15 border-rose-500/25" },
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -75,25 +109,29 @@ const FLAG_STYLES: Record<FlagSeverity, {
   wrapper: string;
   icon: string;
   iconColor: string;
+  labelColor: string;
   label: string;
 }> = {
   danger: {
-    wrapper: "border-l-2 border-l-red-500 border border-red-500/20 bg-red-500/10 text-red-300",
-    icon: "⚠",
-    iconColor: "text-red-400",
-    label: "danger",
+    wrapper:    "border-l-2 border-l-red-500 border border-red-500/20 bg-red-500/10 text-red-200",
+    icon:       "⚠",
+    iconColor:  "text-red-400",
+    labelColor: "text-red-400",
+    label:      "danger",
   },
   warning: {
-    wrapper: "border-l-2 border-l-amber-400 border border-amber-400/20 bg-amber-400/10 text-amber-200",
-    icon: "⚡",
-    iconColor: "text-amber-400",
-    label: "warning",
+    wrapper:    "border-l-2 border-l-amber-400 border border-amber-400/20 bg-amber-400/10 text-amber-100",
+    icon:       "⚡",
+    iconColor:  "text-amber-400",
+    labelColor: "text-amber-400",
+    label:      "warning",
   },
   safe: {
-    wrapper: "border-l-2 border-l-emerald-500 border border-emerald-500/15 bg-emerald-500/5 text-emerald-300",
-    icon: "✓",
-    iconColor: "text-emerald-400",
-    label: "safe",
+    wrapper:    "border-l-2 border-l-emerald-500 border border-emerald-500/20 bg-emerald-500/5 text-emerald-200",
+    icon:       "✓",
+    iconColor:  "text-emerald-400",
+    labelColor: "text-emerald-400",
+    label:      "safe",
   },
 };
 
@@ -103,11 +141,17 @@ const FLAG_STYLES: Record<FlagSeverity, {
 
 function RiskBadge({ risk }: { risk: RiskLevel }) {
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-mono-num font-semibold tracking-widest uppercase ${riskClasses(risk)}`}
-    >
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-mono-num font-semibold tracking-widest uppercase ${riskClasses(risk)}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${riskDot(risk)}`} />
       {risk}
+    </span>
+  );
+}
+
+function PillBadge({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-slate-700/50 bg-slate-800/50 text-[10px] font-mono-num text-slate-400 tracking-wide">
+      {children}
     </span>
   );
 }
@@ -122,11 +166,11 @@ function MetaGrid({ result }: { result: LookupResult }) {
     { label: "Mode",     value: result.mode },
   ];
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-slate-700/30 rounded-lg overflow-hidden border border-slate-700/40">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-slate-700/20 rounded-lg overflow-hidden border border-slate-700/30">
       {items.map(({ label, value }) => (
-        <div key={label} className="bg-[#0e1117] px-3 py-2.5">
-          <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">{label}</div>
-          <div className="font-mono-num text-sm text-slate-200">{value}</div>
+        <div key={label} className="bg-[#0e1117] px-4 py-3">
+          <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">{label}</div>
+          <div className="font-mono-num text-sm text-slate-200 truncate">{value}</div>
         </div>
       ))}
     </div>
@@ -139,73 +183,49 @@ function AnalysisExpander({ text }: { text: string }) {
   const [height, setHeight] = useState(0);
 
   useLayoutEffect(() => {
-    if (contentRef.current) {
-      setHeight(contentRef.current.scrollHeight);
-    }
+    if (contentRef.current) setHeight(contentRef.current.scrollHeight);
   }, [text]);
 
-  // Strip the trailing JSON line from display text
   const displayText = text.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
-
-  // Split into paragraphs for readable rendering
-  const paragraphs = displayText
-    .split(/\n{2,}/)
-    .map(p => p.replace(/\n/g, " ").trim())
-    .filter(Boolean);
-
-  // One-line preview: first non-empty paragraph, truncated
-  const preview = paragraphs[0] ?? displayText.slice(0, 120);
+  const paragraphs  = displayText.split(/\n{2,}/).map(p => p.replace(/\n/g, " ").trim()).filter(Boolean);
+  const preview     = paragraphs[0] ?? displayText.slice(0, 120);
 
   return (
-    <div className="rounded-lg border border-slate-700/40 overflow-hidden">
-      {/* Toggle button */}
+    <div className="rounded-lg border border-slate-700/50 overflow-hidden">
+      {/* Toggle button — visible, bordered, chevron rotates */}
       <button
         onClick={() => setExpanded(v => !v)}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-left transition-colors duration-150 ${
-          expanded
-            ? "bg-slate-800/60 border-b border-slate-700/40"
-            : "bg-slate-800/30 hover:bg-slate-800/50"
+        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors duration-150 ${
+          expanded ? "bg-slate-800/70 border-b border-slate-700/40" : "bg-slate-800/40 hover:bg-slate-800/60"
         }`}
       >
-        <div className="flex items-center gap-2">
-          {/* Chevron */}
+        <div className="flex items-center gap-2.5">
           <svg
-            className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${expanded ? "rotate-90" : "rotate-0"}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2.5}
+            className={`w-4 h-4 text-indigo-400 transition-transform duration-300 ${expanded ? "rotate-90" : "rotate-0"}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-xs font-semibold text-slate-300 tracking-wide">Full AI Analysis</span>
+          <span className="text-xs font-semibold text-slate-200 tracking-wide">Full AI Analysis</span>
         </div>
-        <span className="text-[10px] font-mono-num text-slate-600">
+        <span className="text-[10px] font-mono-num text-slate-500">
           {expanded ? "collapse" : `${paragraphs.length} section${paragraphs.length !== 1 ? "s" : ""}`}
         </span>
       </button>
 
-      {/* Collapsed preview — one line with fade-out gradient */}
+      {/* One-line preview with fade */}
       {!expanded && (
-        <div className="relative px-3.5 py-2.5 bg-slate-900/30">
-          <p className="text-xs text-slate-500 leading-relaxed line-clamp-1 pr-8">{preview}</p>
+        <div className="relative px-4 py-2.5 bg-slate-900/20">
+          <p className="text-xs text-slate-500 leading-relaxed truncate pr-10">{preview}</p>
           <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[#0e1117] to-transparent pointer-events-none" />
         </div>
       )}
 
-      {/* Animated expanded body */}
-      <div
-        style={{
-          height: expanded ? height : 0,
-          transition: "height 320ms cubic-bezier(0.4, 0, 0.2, 1)",
-          overflow: "hidden",
-        }}
-      >
-        <div ref={contentRef} className="px-3.5 py-4 bg-slate-900/30 space-y-3">
+      {/* Height-animated expanded body */}
+      <div style={{ height: expanded ? height : 0, transition: "height 320ms cubic-bezier(0.4,0,0.2,1)", overflow: "hidden" }}>
+        <div ref={contentRef} className="px-4 py-4 bg-slate-900/20 space-y-3">
           {paragraphs.map((para, i) => (
-            <p key={i} className="text-xs text-slate-400 leading-relaxed">
-              {para}
-            </p>
+            <p key={i} className="text-xs text-slate-400 leading-relaxed">{para}</p>
           ))}
         </div>
       </div>
@@ -213,25 +233,86 @@ function AnalysisExpander({ text }: { text: string }) {
   );
 }
 
-function ResultCard({ result }: { result: LookupResult }) {
+function useCopyButton(getText: () => string) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(getText()).then(() => {
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    });
+  }, [getText]);
+  return { copied, copy };
+}
+
+function CopyButton({ label, getText }: { label: string; getText: () => string }) {
+  const { copied, copy } = useCopyButton(getText);
   return (
-    <div className="rounded-xl border border-slate-700/60 bg-[#0e1117] overflow-hidden terminal-glow">
+    <button
+      onClick={copy}
+      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono-num transition-all duration-150 ${
+        copied
+          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+          : "border-slate-600/50 bg-slate-800/40 text-slate-400 hover:border-slate-500/60 hover:text-slate-200 hover:bg-slate-700/40"
+      }`}
+    >
+      {copied ? (
+        <>
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+          Copied
+        </>
+      ) : (
+        <>
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <rect x="9" y="9" width="13" height="13" rx="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+          </svg>
+          {label}
+        </>
+      )}
+    </button>
+  );
+}
+
+function ResultCard({ result }: { result: LookupResult }) {
+  const displayNumber = result.parsed.internationalFormat ?? result.parsed.raw;
+  const cleanAnalysis = result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
+
+  const getReportText = useCallback(() =>
+    ["PhoneScan Report", `${displayNumber} — ${result.risk} Risk`, result.summary, "",
+     "Findings:", ...result.flags.map(f => `• ${f}`), "", "Analysis:", cleanAnalysis].join("\n"),
+    [displayNumber, result.risk, result.summary, result.flags, cleanAnalysis]
+  );
+
+  const getShareText = useCallback(() =>
+    `${displayNumber} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+    [displayNumber, result.risk, result.summary]
+  );
+
+  return (
+    <div className="rounded-xl border border-slate-700/50 bg-[#0e1117] overflow-hidden terminal-glow">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700/40 bg-slate-800/20">
-        <div className="flex items-center gap-3">
-          <span className="font-mono-num text-lg text-indigo-300 tracking-wide">
-            {result.parsed.internationalFormat ?? result.parsed.raw}
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700/40 bg-slate-800/20">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="font-mono-num text-lg text-indigo-300 tracking-wide truncate">
+            {displayNumber}
           </span>
           <RiskBadge risk={result.risk} />
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-mono-num">
-          {result.depth} · {result.mode}
-        </span>
+        <div className="flex items-center gap-2 shrink-0 ml-3">
+          <CopyButton label="Copy"  getText={getReportText} />
+          <CopyButton label="Share" getText={getShareText}  />
+          <PillBadge>{result.depth}</PillBadge>
+          <PillBadge>{result.mode}</PillBadge>
+        </div>
       </div>
 
-      <div className="p-4 space-y-4">
+      <div className="p-5 space-y-5">
         {/* Summary */}
-        <p className="text-slate-300 text-sm leading-relaxed border-l-2 border-indigo-500/50 pl-3">
+        <p className="text-slate-300 text-sm leading-relaxed border-l-2 border-indigo-500/50 pl-4">
           {result.summary}
         </p>
 
@@ -241,23 +322,23 @@ function ResultCard({ result }: { result: LookupResult }) {
         {/* Flags */}
         {result.flags.length > 0 && (
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">
+            <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-2.5">
               Intelligence Flags
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {result.flags.map((flag, i) => {
                 const severity = classifyFlag(flag);
-                const style = FLAG_STYLES[severity];
+                const style    = FLAG_STYLES[severity];
                 return (
                   <div
                     key={i}
-                    className={`flex items-start gap-2.5 px-3 py-2.5 rounded-r-lg text-xs leading-relaxed ${style.wrapper}`}
+                    className={`flex items-start gap-2.5 px-3.5 py-2.5 rounded-r-lg text-xs leading-relaxed ${style.wrapper}`}
                   >
                     <span className={`shrink-0 text-sm leading-none mt-px font-bold ${style.iconColor}`}>
                       {style.icon}
                     </span>
-                    <span className="flex-1">{flag}</span>
-                    <span className={`shrink-0 self-center font-mono-num text-[9px] uppercase tracking-widest opacity-40 ${style.iconColor}`}>
+                    <span className="flex-1 min-w-0">{flag}</span>
+                    <span className={`shrink-0 self-center font-mono-num text-[9px] uppercase tracking-widest ${style.labelColor}`}>
                       {style.label}
                     </span>
                   </div>
@@ -274,20 +355,12 @@ function ResultCard({ result }: { result: LookupResult }) {
   );
 }
 
-function HistoryPanel({
-  history,
-  onReplay,
-}: {
-  history: HistoryEntry[];
-  onReplay: (number: string) => void;
-}) {
+function HistoryPanel({ history, onReplay }: { history: HistoryEntry[]; onReplay: (n: string) => void }) {
   if (history.length === 0) return null;
   return (
     <div className="rounded-xl border border-slate-700/40 bg-[#0e1117]/60 overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-slate-700/30 flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-syne">
-          Recent Lookups
-        </span>
+      <div className="px-5 py-3 border-b border-slate-700/30 flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-syne">Recent Lookups</span>
         <span className="text-[10px] font-mono-num text-slate-600">({history.length})</span>
       </div>
       <div className="divide-y divide-slate-700/20">
@@ -295,19 +368,17 @@ function HistoryPanel({
           <button
             key={i}
             onClick={() => onReplay(entry.parsed.raw)}
-            className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-slate-800/30 transition-colors text-left group"
+            className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-slate-800/30 transition-colors text-left group"
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDot(entry.risk)}`} />
-              <span className="font-mono-num text-sm text-slate-300 group-hover:text-indigo-300 transition-colors">
+              <span className="font-mono-num text-sm text-slate-300 group-hover:text-indigo-300 transition-colors truncate">
                 {entry.parsed.internationalFormat ?? entry.parsed.raw}
               </span>
-              <span className="text-[10px] text-slate-600">{entry.mode}</span>
+              <span className="text-[10px] text-slate-600 shrink-0">{entry.mode}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-[10px] font-mono-num px-1.5 py-0.5 rounded border ${riskClasses(entry.risk)}`}
-              >
+            <div className="flex items-center gap-3 shrink-0">
+              <span className={`text-[10px] font-mono-num px-1.5 py-0.5 rounded border ${riskClasses(entry.risk)}`}>
                 {entry.risk}
               </span>
               <span className="text-[10px] text-slate-600 font-mono-num">{entry.queriedAt}</span>
@@ -324,60 +395,42 @@ function HistoryPanel({
 // ---------------------------------------------------------------------------
 
 export default function Home() {
-  const [number, setNumber] = useState("");
-  const [mode, setMode] = useState<Mode>("consumer");
-  const [depth, setDepth] = useState<Depth>("standard");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<LookupResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [number,    setNumber]    = useState("");
+  const [mode,      setMode]      = useState<Mode>("consumer");
+  const [depth,     setDepth]     = useState<Depth>("standard");
+  const [loading,   setLoading]   = useState(false);
+  const [result,    setResult]    = useState<LookupResult | null>(null);
+  const [error,     setError]     = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const [history,   setHistory]   = useState<HistoryEntry[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const lookup = useCallback(
-    async (raw?: string) => {
-      const target = (raw ?? number).trim();
-      if (!target) return;
-
-      setLoading(true);
-      setError(null);
-      setResult(null);
-
-      try {
-        const res = await fetch("/api/lookup", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ number: target, mode, depth }),
-        });
-
-        const rem = res.headers.get("X-RateLimit-Remaining");
-        if (rem !== null) setRemaining(parseInt(rem, 10));
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setError(data.error ?? "Something went wrong.");
-          return;
-        }
-
-        setResult(data);
-        setHistory(prev =>
-          [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 10)
-        );
-      } catch {
-        setError("Network error — please check your connection and try again.");
-      } finally {
-        setLoading(false);
-      }
-    },
-    [number, mode, depth]
-  );
+  const lookup = useCallback(async (raw?: string) => {
+    const target = (raw ?? number).trim();
+    if (!target) return;
+    setLoading(true); setError(null); setResult(null);
+    try {
+      const res  = await fetch("/api/lookup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number: target, mode, depth }),
+      });
+      const rem = res.headers.get("X-RateLimit-Remaining");
+      if (rem !== null) setRemaining(parseInt(rem, 10));
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
+      setResult(data);
+      setHistory(prev => [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
+    } catch {
+      setError("Network error — please check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+  }, [number, mode, depth]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && document.activeElement === inputRef.current) {
-        lookup();
-      }
+      if (e.key === "Enter" && document.activeElement === inputRef.current) lookup();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -385,79 +438,110 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#0a0b0d] text-slate-200">
-      {/* Subtle grid overlay */}
+      {/* Global grid overlay */}
       <div
-        className="fixed inset-0 pointer-events-none opacity-[0.03]"
+        className="fixed inset-0 pointer-events-none opacity-[0.025]"
         style={{
-          backgroundImage:
-            "linear-gradient(#6366f1 1px, transparent 1px), linear-gradient(90deg, #6366f1 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(#6366f1 1px, transparent 1px), linear-gradient(90deg, #6366f1 1px, transparent 1px)",
           backgroundSize: "40px 40px",
         }}
       />
 
-      <div className="relative max-w-3xl mx-auto px-4 py-10 space-y-8">
+      <div className="relative max-w-[900px] mx-auto px-6 py-10 space-y-8">
 
         {/* ---------------------------------------------------------------- */}
-        {/* Header                                                           */}
+        {/* Nav header                                                       */}
         {/* ---------------------------------------------------------------- */}
-        <header className="space-y-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-sm">
-                ⌖
-              </div>
-              <h1 className="font-syne text-2xl font-bold tracking-tight text-white">
-                PhoneScan
-              </h1>
+        <header className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-sm select-none">
+              ⌖
             </div>
-            {remaining !== null && (
-              <div className="flex items-center gap-1.5 text-[11px] font-mono-num text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
-                {remaining} lookups remaining today
-              </div>
-            )}
+            <span className="font-syne text-xl font-bold tracking-tight text-white">PhoneScan</span>
+            <span className="text-slate-700 text-sm hidden sm:block">·</span>
+            <span className="text-slate-500 text-sm hidden sm:block">
+              Powered by <span className="text-indigo-400/80">Groq AI</span>
+            </span>
           </div>
-          <p className="text-slate-500 text-sm pl-11">
-            Free phone intelligence · Powered by{" "}
-            <span className="text-indigo-400/80">Groq AI</span>
-          </p>
+          {remaining !== null && (
+            <div className="flex items-center gap-1.5 text-[11px] font-mono-num text-slate-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
+              {remaining} lookups remaining today
+            </div>
+          )}
         </header>
+
+        {/* ---------------------------------------------------------------- */}
+        {/* Hero                                                             */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="relative rounded-xl overflow-hidden border border-slate-800/50 px-6 py-6">
+          {/* Scanline texture */}
+          <div
+            className="absolute inset-0 pointer-events-none opacity-[0.035]"
+            style={{ backgroundImage: "repeating-linear-gradient(0deg,#e2e8f0 0px,#e2e8f0 1px,transparent 1px,transparent 4px)" }}
+          />
+          {/* Radial accent */}
+          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_100%_at_20%_50%,rgba(99,102,241,0.07),transparent)]" />
+          <div className="relative">
+            <h2 className="font-syne text-[2rem] font-extrabold tracking-tight text-white leading-tight mb-2">
+              Who just called you?
+              <span
+                className="inline-block w-[3px] h-[0.9em] ml-2 align-middle bg-indigo-400"
+                style={{ animation: "blink 1s step-end infinite" }}
+              />
+            </h2>
+            <p className="text-slate-400 text-sm leading-relaxed">
+              Free AI-powered phone intelligence —{" "}
+              <span className="text-slate-300">scam detection</span>,{" "}
+              <span className="text-slate-300">security research</span> and{" "}
+              <span className="text-slate-300">OSINT</span> in seconds.
+            </p>
+          </div>
+        </div>
 
         {/* ---------------------------------------------------------------- */}
         {/* Mode cards                                                       */}
         {/* ---------------------------------------------------------------- */}
-        <div className="grid grid-cols-3 gap-3">
-          {MODES.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className={`rounded-xl border p-3 text-left transition-all duration-150 ${
-                mode === m.id
-                  ? "border-indigo-500/50 bg-indigo-500/10 shadow-[0_0_20px_rgba(99,102,241,0.1)]"
-                  : "border-slate-700/50 bg-slate-800/20 hover:border-slate-600/50 hover:bg-slate-800/40"
-              }`}
-            >
-              <div className="text-xl mb-1.5">{m.emoji}</div>
-              <div
-                className={`font-syne text-sm font-semibold mb-0.5 ${
-                  mode === m.id ? "text-indigo-300" : "text-slate-300"
+        <div className="grid grid-cols-3 gap-4">
+          {MODES.map(m => {
+            const active  = mode === m.id;
+            const colours = MODE_COLOURS[m.id];
+            return (
+              <button
+                key={m.id}
+                onClick={() => setMode(m.id)}
+                className={`rounded-xl border p-4 text-left transition-all duration-200 ${
+                  active
+                    ? colours.active
+                    : "border-slate-700/40 bg-slate-800/20 hover:border-slate-600/50 hover:bg-slate-800/40"
                 }`}
               >
-                {m.label}
-              </div>
-              <div className="text-[11px] text-slate-500 leading-snug">{m.desc}</div>
-            </button>
-          ))}
+                {/* Icon box */}
+                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center mb-3 transition-colors ${
+                  active ? colours.icon : "text-slate-500 bg-slate-800/50 border-slate-700/40"
+                }`}>
+                  {m.icon}
+                </div>
+                <div className={`font-syne text-sm font-semibold mb-1 ${active ? "text-white" : "text-slate-300"}`}>
+                  {m.label}
+                </div>
+                <div className="text-[11px] text-slate-500 leading-snug">{m.desc}</div>
+              </button>
+            );
+          })}
         </div>
 
         {/* ---------------------------------------------------------------- */}
         {/* Phone input + depth + examples                                   */}
         {/* ---------------------------------------------------------------- */}
         <div className="space-y-3">
-          {/* Input row */}
-          <div className="relative">
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 font-mono-num text-sm select-none">
-              $
+          {/* Input row — 52px tall */}
+          <div className="relative flex items-center">
+            {/* Phone icon */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+              </svg>
             </div>
             <input
               ref={inputRef}
@@ -465,12 +549,12 @@ export default function Home() {
               value={number}
               onChange={e => setNumber(e.target.value)}
               placeholder="+1 800 555 0123"
-              className="w-full bg-[#0e1117] border border-slate-700/60 rounded-xl pl-9 pr-36 py-3.5 font-mono-num text-base text-slate-200 placeholder-slate-700 focus:outline-none focus:border-indigo-500/50 focus:shadow-[0_0_20px_rgba(99,102,241,0.08)] transition-all"
+              className="w-full h-[52px] bg-[#0e1117] border border-slate-700/60 rounded-xl pl-11 pr-[140px] font-mono-num text-base text-slate-200 placeholder-slate-700 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
             />
             <button
               onClick={() => lookup()}
               disabled={loading || !number.trim()}
-              className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-syne font-semibold transition-colors"
+              className="absolute right-2 h-[38px] px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-syne font-semibold transition-colors"
             >
               {loading ? (
                 <span className="flex items-center gap-1.5">
@@ -480,17 +564,13 @@ export default function Home() {
                   </svg>
                   Scanning
                 </span>
-              ) : (
-                "Analyze →"
-              )}
+              ) : "Analyze →"}
             </button>
           </div>
 
           {/* Depth pills */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">
-              Depth
-            </span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">Depth</span>
             <div className="flex gap-1.5">
               {DEPTHS.map(d => (
                 <button
@@ -509,11 +589,9 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Example number chips */}
+          {/* Example chips */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">
-              Examples
-            </span>
+            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">Examples</span>
             {EXAMPLE_NUMBERS.map(ex => (
               <button
                 key={ex.number}
@@ -530,17 +608,17 @@ export default function Home() {
         </div>
 
         {/* ---------------------------------------------------------------- */}
-        {/* Error banner                                                     */}
+        {/* Error                                                            */}
         {/* ---------------------------------------------------------------- */}
         {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono-num flex items-start gap-2">
+          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 font-mono-num flex items-start gap-2">
             <span className="mt-0.5 shrink-0">✕</span>
             {error}
           </div>
         )}
 
         {/* ---------------------------------------------------------------- */}
-        {/* Loading state                                                    */}
+        {/* Loading                                                          */}
         {/* ---------------------------------------------------------------- */}
         {loading && (
           <div className="rounded-xl border border-slate-700/40 bg-[#0e1117] p-6 space-y-3">
@@ -551,56 +629,41 @@ export default function Home() {
               </span>
             </div>
             <div className="space-y-2">
-              {["Parsing number metadata", "Querying Groq LLM", "Extracting intelligence"].map(
-                (step, i) => (
-                  <div
-                    key={step}
-                    className="flex items-center gap-2 text-[11px] text-slate-600 font-mono-num"
-                  >
-                    <svg
-                      className="w-3 h-3 animate-spin"
-                      style={{ animationDelay: `${i * 0.2}s` }}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                    {step}
-                  </div>
-                )
-              )}
+              {["Parsing number metadata", "Querying Groq LLM", "Extracting intelligence"].map((step, i) => (
+                <div key={step} className="flex items-center gap-2 text-[11px] text-slate-600 font-mono-num">
+                  <svg className="w-3 h-3 animate-spin" style={{ animationDelay: `${i * 0.2}s` }} fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                  </svg>
+                  {step}
+                </div>
+              ))}
             </div>
           </div>
         )}
 
         {/* ---------------------------------------------------------------- */}
-        {/* Result card                                                      */}
+        {/* Result                                                           */}
         {/* ---------------------------------------------------------------- */}
         {result && !loading && <ResultCard result={result} />}
 
         {/* ---------------------------------------------------------------- */}
         {/* History                                                          */}
         {/* ---------------------------------------------------------------- */}
-        <HistoryPanel
-          history={history}
-          onReplay={num => { setNumber(num); lookup(num); }}
-        />
+        <HistoryPanel history={history} onReplay={num => { setNumber(num); lookup(num); }} />
 
         {/* ---------------------------------------------------------------- */}
         {/* Footer                                                           */}
         {/* ---------------------------------------------------------------- */}
-        <footer className="pt-4 border-t border-slate-800/60 space-y-2">
+        <footer className="pt-4 border-t border-slate-800/50">
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            <span className="text-slate-500 font-semibold">Disclaimer:</span> PhoneScan provides
-            AI-generated intelligence for informational purposes only. Results are not guaranteed to
-            be accurate or complete. Do not use this tool to make legal, financial, or safety
-            decisions. Red Team mode is intended for authorised security research only.
+            PhoneScan provides AI-generated intelligence for informational purposes only. Results are not guaranteed to be accurate or complete. Do not use this tool to make legal, financial, or safety decisions. Red Team mode is intended for authorised security research only.
           </p>
-          <p className="text-[10px] text-slate-700 font-mono-num">
+          <p className="text-[10px] text-slate-700 font-mono-num mt-1.5">
             PhoneScan · {new Date().getFullYear()} · Rate limited to 20 lookups / 24 h per IP
           </p>
         </footer>
+
       </div>
     </div>
   );
