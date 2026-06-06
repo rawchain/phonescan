@@ -93,6 +93,24 @@ function isValidIpAddress(s: string): boolean {
   return /^(\d{1,3}\.){3}\d{1,3}$/.test(s) || /^[0-9a-fA-F:]{2,45}$/.test(s);
 }
 
+function isDomain(s: string): boolean {
+  return /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$/.test(s);
+}
+
+async function resolveDomainToIp(domain: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`,
+      { cache: "no-store", signal: AbortSignal.timeout(5000) }
+    );
+    const data = await res.json() as { Answer?: Array<{ type: number; data: string }> };
+    const aRecord = data.Answer?.find(r => r.type === 1);
+    return aRecord?.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function reverseIpv4ForPTR(ip: string): string | null {
   const parts = ip.split(".");
   if (parts.length !== 4) return null;
@@ -150,12 +168,26 @@ export async function POST(req: NextRequest) {
   if (typeof rawIp !== "string" || !rawIp.trim())
     return NextResponse.json({ error: "An IP address is required." }, { status: 400 });
 
-  const ip = rawIp.trim();
-  if (!isValidIpAddress(ip))
-    return NextResponse.json(
-      { error: "Invalid IP address format. Please enter a valid IPv4 or IPv6 address." },
-      { status: 400 }
-    );
+  const originalInput = rawIp.trim();
+  let ip = originalInput;
+
+  // If it looks like a domain rather than an IP, resolve it first
+  if (!isValidIpAddress(originalInput)) {
+    if (!isDomain(originalInput)) {
+      return NextResponse.json(
+        { error: "Invalid input. Please enter a valid IPv4 address, IPv6 address, or domain name." },
+        { status: 400 }
+      );
+    }
+    const resolved = await resolveDomainToIp(originalInput);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: `Could not resolve "${originalInput}" to an IP address. Check the domain and try again.` },
+        { status: 400 }
+      );
+    }
+    ip = resolved;
+  }
 
   const validDepths: Depth[] = ["quick", "standard", "deep"];
   const depth: Depth = validDepths.includes(rawDepth as Depth) ? (rawDepth as Depth) : "standard";
@@ -243,6 +275,8 @@ export async function POST(req: NextRequest) {
   // ---------------------------------------------------------------------------
   const merged = {
     ip,
+    original_input: originalInput,
+    resolved_ip: ip,
     country:     (ipApi?.country ?? ipapiIsLoc?.country ?? null) as string | null,
     countryCode: (ipApi?.countryCode ?? ipapiIsLoc?.country_code ?? null) as string | null,
     city:        (ipApi?.city ?? ipapiIsLoc?.city ?? null) as string | null,
@@ -284,7 +318,7 @@ export async function POST(req: NextRequest) {
   const systemPrompt = getSystemPrompt("red");
 
   const metaLines = [
-    `IP Address: ${ip}`,
+    `IP Address: ${ip}${originalInput !== ip ? ` (resolved from domain: ${originalInput})` : ""}`,
     merged.country   ? `Country: ${merged.country} (${merged.countryCode ?? "?"})` : null,
     merged.city      ? `City: ${merged.city}${merged.region ? `, ${merged.region}` : ""}` : null,
     merged.isp       ? `ISP: ${merged.isp}` : null,

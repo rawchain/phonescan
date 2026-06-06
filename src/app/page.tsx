@@ -19,15 +19,16 @@ const EXAMPLE_NUMBERS = [
 ];
 
 const EXAMPLE_IPS = [
-  { label: "8.8.8.8",           note: "Google DNS"      },
-  { label: "1.1.1.1",           note: "Cloudflare DNS"  },
-  { label: "208.67.222.222",    note: "OpenDNS"         },
+  { label: "8.8.8.8",    note: "Google DNS"      },
+  { label: "1.1.1.1",    note: "Cloudflare DNS"  },
+  { label: "google.com", note: "Google"           },
+  { label: "github.com", note: "GitHub"           },
 ];
 
 const MODES: { id: Mode; label: string; placeholder: string }[] = [
   { id: "consumer", label: "📞 SCAM CHECK",    placeholder: "+1 555 123 4567  or  +44 7700 900000" },
   { id: "blue",     label: "📞 PHONE LOOKUP",  placeholder: "+1 800 555 0199  or  +49 30 12345678" },
-  { id: "red",      label: "🌐 IP LOOKUP",     placeholder: "8.8.8.8  or  2001:4860:4860::8888"   },
+  { id: "red",      label: "🌐 IP LOOKUP",     placeholder: "IP address or domain (e.g. 8.8.8.8 or google.com)" },
 ];
 
 const DEPTHS: { id: Depth; label: string }[] = [
@@ -92,6 +93,10 @@ function isValidIp(s: string): boolean {
   const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
   const ipv6 = /^[0-9a-fA-F:]{2,45}$/;
   return ipv4.test(s) || ipv6.test(s);
+}
+
+function isValidDomain(s: string): boolean {
+  return /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$/.test(s);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,8 +405,13 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
               </span>
             </div>
             <div className="font-mono text-xl text-white tracking-[2px] break-all">{result.ip}</div>
+            {result.original_input !== result.resolved_ip && (
+              <div className="font-mono text-[11px] text-[var(--accent)] opacity-70 mt-0.5">
+                ↳ resolved from {result.original_input}
+              </div>
+            )}
             {result.reverse_dns && (
-              <div className="font-mono text-[11px] text-[var(--accent)] opacity-70 mt-0.5 break-all">
+              <div className="font-mono text-[11px] text-[var(--accent)] opacity-50 mt-0.5 break-all">
                 ↳ {result.reverse_dns}
               </div>
             )}
@@ -571,9 +581,9 @@ export default function Home() {
     const target = (raw ?? number).trim();
     if (!target) return;
 
-    // IP mode validation
-    if (mode === "red" && !isValidIp(target)) {
-      setError("Invalid IP address. Please enter a valid IPv4 (e.g. 8.8.8.8) or IPv6 address.");
+    // IP mode validation — accept IPs and domain names
+    if (mode === "red" && !isValidIp(target) && !isValidDomain(target)) {
+      setError("Invalid input. Enter a valid IP address (e.g. 8.8.8.8) or domain (e.g. google.com).");
       return;
     }
 
@@ -717,7 +727,7 @@ export default function Home() {
         {/* Input section */}
         <div className="px-8 pt-7 pb-6 border-b border-[var(--border)]">
           <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
-            {mode === "red" ? "// ENTER IP ADDRESS (IPv4 or IPv6)" : "// ENTER NUMBER (with country code)"}
+            {mode === "red" ? "// ENTER IP ADDRESS OR DOMAIN" : "// ENTER NUMBER (with country code)"}
           </span>
           <div className="flex gap-3">
             <input

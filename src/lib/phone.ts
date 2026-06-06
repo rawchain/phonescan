@@ -60,6 +60,9 @@ export interface IpLookupResult {
   whois_org: string | null;
   whois_network_name: string | null;
   whois_abuse_email: string | null;
+  // Domain resolution
+  original_input: string;   // what the user typed (may be a domain)
+  resolved_ip: string;      // the actual IP used for lookup
   // AI
   risk: RiskLevel;
   summary: string;
