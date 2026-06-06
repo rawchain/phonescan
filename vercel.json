@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "regions": ["iad1"],
+  "env": {
+    "RATE_LIMIT_PER_DAY": "20"
+  }
+}
