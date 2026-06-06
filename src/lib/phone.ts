@@ -55,6 +55,12 @@ export interface IpLookupResult {
   abuse_total_reports: number | null;
   abuse_last_reported: string | null;
   abuse_usage_type: string | null;
+  abuse_reports: Array<{
+    reportedAt: string;
+    comment: string;
+    categories: string[]; // human-readable labels
+    reporterCountryCode: string;
+  }>;
   // Reverse DNS + WHOIS
   reverse_dns: string | null;
   whois_org: string | null;

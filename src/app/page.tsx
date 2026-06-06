@@ -312,6 +312,78 @@ function ResultCard({ result }: { result: LookupResult }) {
 // IP result card
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Abuse reports
+// ---------------------------------------------------------------------------
+
+interface AbuseReport {
+  reportedAt: string;
+  comment: string;
+  categories: string[];
+  reporterCountryCode: string;
+}
+
+function AbuseReports({ reports }: { reports: AbuseReport[] }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // "no reports" state — reports array exists but is empty (AbuseIPDB responded)
+  if (reports.length === 0) {
+    return (
+      <div className="border border-[var(--border)] rounded-sm bg-[#070910] px-4 py-3">
+        <span className="font-mono text-[10px] tracking-[3px] text-[#00ff88] opacity-70">
+          {"// NO ABUSE REPORTS IN LAST 90 DAYS"}
+        </span>
+      </div>
+    );
+  }
+
+  const visible = expanded ? reports : reports.slice(0, 5);
+
+  return (
+    <div>
+      <SectionLabel>RECENT ABUSE REPORTS</SectionLabel>
+      <div className="border border-[var(--border)] rounded-sm overflow-hidden divide-y divide-[var(--border)]">
+        {visible.map((r, i) => {
+          const date = new Date(r.reportedAt);
+          const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+          const flag = flagEmoji(r.reporterCountryCode);
+          return (
+            <div key={i} className="px-4 py-3 bg-[#070910] space-y-2">
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="font-mono text-[10px] text-[var(--muted)]">{dateStr}</span>
+                <span className="text-sm leading-none">{flag}</span>
+                {r.categories.map(cat => (
+                  <span
+                    key={cat}
+                    className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                    style={{ borderColor: "rgba(255,184,0,0.3)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                  >
+                    {cat}
+                  </span>
+                ))}
+              </div>
+              <p className="font-mono text-[11px] text-[var(--text)] leading-relaxed">
+                {r.comment
+                  ? (r.comment.length > 80 ? r.comment.slice(0, 80) + "…" : r.comment)
+                  : <span className="text-[var(--muted)]">No comment provided</span>
+                }
+              </p>
+            </div>
+          );
+        })}
+      </div>
+      {reports.length > 5 && (
+        <button
+          onClick={() => setExpanded(v => !v)}
+          className="font-mono text-[10px] tracking-[2px] text-[var(--accent)] opacity-60 hover:opacity-100 transition-opacity mt-2"
+        >
+          {expanded ? "← Show fewer" : `Show all ${reports.length} reports →`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ScoreBar({ label, score, lowGood }: { label: string; score: number | null; lowGood?: boolean }) {
   if (score === null) return null;
   const pct = Math.min(100, Math.max(0, score));
@@ -489,6 +561,9 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
             )}
           </div>
         )}
+
+        {/* Abuse reports */}
+        <AbuseReports reports={result.abuse_reports} />
 
         {/* Info grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

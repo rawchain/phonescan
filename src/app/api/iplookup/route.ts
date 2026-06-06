@@ -111,6 +111,16 @@ async function resolveDomainToIp(domain: string): Promise<string | null> {
   }
 }
 
+// AbuseIPDB category ID → human-readable label
+const ABUSE_CATEGORIES: Record<number, string> = {
+  3: "Fraud Orders", 4: "DDoS Attack", 5: "FTP Brute-Force",
+  6: "Ping of Death", 7: "Phishing", 9: "Open Proxy",
+  10: "Web Spam", 11: "Email Spam", 14: "Port Scan",
+  15: "Hacking", 16: "SQL Injection", 17: "Spoofing",
+  18: "Brute-Force", 19: "Bad Web Bot", 20: "Exploited Host",
+  21: "Web App Attack", 22: "SSH", 23: "IoT Targeted",
+};
+
 function reverseIpv4ForPTR(ip: string): string | null {
   const parts = ip.split(".");
   if (parts.length !== 4) return null;
@@ -305,6 +315,18 @@ export async function POST(req: NextRequest) {
                               ? Number(abuseData.totalReports) : null,
     abuse_last_reported:    (abuseData?.lastReportedAt as string | null | undefined) ?? null,
     abuse_usage_type:       (abuseData?.usageType as string | null | undefined) ?? null,
+    abuse_reports: Array.isArray(abuseData?.reports)
+      ? (abuseData!.reports as Array<Record<string, unknown>>)
+          .slice(0, 10)
+          .map(r => ({
+            reportedAt: String(r.reportedAt ?? ""),
+            comment: String(r.comment ?? "").trim(),
+            categories: Array.isArray(r.categories)
+              ? (r.categories as number[]).map(id => ABUSE_CATEGORIES[id] ?? `Category ${id}`)
+              : [],
+            reporterCountryCode: String(r.reporterCountryCode ?? ""),
+          }))
+      : [],
     // Reverse DNS + WHOIS
     reverse_dns:        reverseDns,
     whois_org:          whoisOrg,
