@@ -89,24 +89,37 @@ function getClientIp(req: NextRequest): string {
     ?? "unknown";
 }
 
-function isValidIpAddress(s: string): boolean {
-  return /^(\d{1,3}\.){3}\d{1,3}$/.test(s) || /^[0-9a-fA-F:]{2,45}$/.test(s);
+/** Pure IPv4: four numeric octets */
+function isPureIpv4(s: string): boolean {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(s);
 }
 
-function isDomain(s: string): boolean {
-  return /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$/.test(s);
+/** Pure IPv6: contains a colon and only hex digits + colons */
+function isPureIpv6(s: string): boolean {
+  return s.includes(":") && /^[0-9a-fA-F:]+$/.test(s);
+}
+
+/** Anything that isn't a pure IP is treated as a domain to resolve */
+function isIpAddress(s: string): boolean {
+  return isPureIpv4(s) || isPureIpv6(s);
 }
 
 async function resolveDomainToIp(domain: string): Promise<string | null> {
+  const url = `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`;
+  console.log(`[iplookup] DNS request: ${url}`);
   try {
-    const res = await fetch(
-      `https://dns.google/resolve?name=${encodeURIComponent(domain)}&type=A`,
-      { cache: "no-store", signal: AbortSignal.timeout(5000) }
-    );
-    const data = await res.json() as { Answer?: Array<{ type: number; data: string }> };
-    const aRecord = data.Answer?.find(r => r.type === 1);
-    return aRecord?.data ?? null;
-  } catch {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(6000) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await res.json() as { Status?: number; Answer?: Array<Record<string, any>> };
+    console.log(`[iplookup] DNS response status=${data.Status} answers=${JSON.stringify(data.Answer ?? [])}`);
+    if (!Array.isArray(data.Answer)) return null;
+    // type 1 = A record; Google DNS returns type as a number
+    const aRecord = data.Answer.find(r => Number(r.type) === 1);
+    const resolved = aRecord ? String(aRecord.data) : null;
+    console.log(`[iplookup] Resolved: ${resolved}`);
+    return resolved;
+  } catch (err) {
+    console.error(`[iplookup] DNS resolution failed:`, err);
     return null;
   }
 }
@@ -181,14 +194,19 @@ export async function POST(req: NextRequest) {
   const originalInput = rawIp.trim();
   let ip = originalInput;
 
-  // If it looks like a domain rather than an IP, resolve it first
-  if (!isValidIpAddress(originalInput)) {
-    if (!isDomain(originalInput)) {
+  console.log(`[iplookup] Input: "${originalInput}" isIp=${isIpAddress(originalInput)}`);
+
+  if (isIpAddress(originalInput)) {
+    console.log(`[iplookup] Pure IP detected — skipping DNS`);
+  } else {
+    // Treat as domain — must contain at least one letter or dot to be plausible
+    if (!/[a-zA-Z.]/.test(originalInput)) {
       return NextResponse.json(
-        { error: "Invalid input. Please enter a valid IPv4 address, IPv6 address, or domain name." },
+        { error: "Invalid input. Please enter a valid IPv4, IPv6, or domain name." },
         { status: 400 }
       );
     }
+    console.log(`[iplookup] Domain detected — resolving via Google DNS`);
     const resolved = await resolveDomainToIp(originalInput);
     if (!resolved) {
       return NextResponse.json(
@@ -196,6 +214,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    console.log(`[iplookup] "${originalInput}" → ${resolved}`);
     ip = resolved;
   }
 
