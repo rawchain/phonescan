@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
   const { number, mode: rawMode, depth: rawDepth } = body as Record<string, unknown>;
 
   if (typeof number !== "string" || !number.trim()) {
-    return NextResponse.json({ error: "A phone number is required." }, { status: 400 });
+    return NextResponse.json({ error: "A phone number or IP address is required." }, { status: 400 });
   }
 
   const validModes: Mode[] = ["consumer", "blue", "red"];
@@ -129,8 +129,19 @@ export async function POST(req: NextRequest) {
   const mode: Mode = validModes.includes(rawMode as Mode) ? (rawMode as Mode) : "consumer";
   const depth: Depth = validDepths.includes(rawDepth as Depth) ? (rawDepth as Depth) : "standard";
 
-  // --- Parse number ---
-  const parsed = parsePhoneNumber(number);
+  // --- Parse input — skip phone parsing for IP mode ---
+  const parsed = mode === "red"
+    ? {
+        raw: number.trim(),
+        e164: null,
+        country: null,
+        region: null,
+        type: "unknown" as const,
+        valid: true,           // IPs are always "valid" inputs
+        nationalNumber: null,
+        internationalFormat: null,
+      }
+    : parsePhoneNumber(number);
 
   // --- Build prompts ---
   const systemPrompt = getSystemPrompt(mode);

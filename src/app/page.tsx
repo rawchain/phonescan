@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
-import type { LookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
+import { useState, useCallback, useRef, useEffect } from "react";
+import dynamic from "next/dynamic";
+import type { LookupResult, IpLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
+
+const IpMap = dynamic(() => import("@/components/IpMap"), { ssr: false });
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -15,87 +18,42 @@ const EXAMPLE_NUMBERS = [
   { label: "+49 30 12345678", number: "+493012345678", note: "Berlin" },
 ];
 
-const MODES: { id: Mode; label: string; desc: string; icon: React.ReactNode }[] = [
-  {
-    id: "consumer",
-    label: "Scam Check",
-    desc: "Plain-language safety verdict for everyday callers",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-      </svg>
-    ),
-  },
-  {
-    id: "blue",
-    label: "Blue Team",
-    desc: "Defensive SOC analysis with TTPs and controls",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      </svg>
-    ),
-  },
-  {
-    id: "red",
-    label: "Red Team",
-    desc: "OSINT deep-dive with attribution and intel value",
-    icon: (
-      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z" />
-      </svg>
-    ),
-  },
+const EXAMPLE_IPS = [
+  { label: "8.8.8.8",           note: "Google DNS"      },
+  { label: "1.1.1.1",           note: "Cloudflare DNS"  },
+  { label: "208.67.222.222",    note: "OpenDNS"         },
 ];
 
-const DEPTHS: { id: Depth; label: string; desc: string }[] = [
-  { id: "quick",    label: "Quick",     desc: "3-sentence verdict" },
-  { id: "standard", label: "Standard",  desc: "Structured sections" },
-  { id: "deep",     label: "Deep OSINT", desc: "Full intel report" },
+const MODES: { id: Mode; label: string; placeholder: string }[] = [
+  { id: "consumer", label: "📞 SCAM CHECK",    placeholder: "+1 555 123 4567  or  +44 7700 900000" },
+  { id: "blue",     label: "📞 PHONE LOOKUP",  placeholder: "+1 800 555 0199  or  +49 30 12345678" },
+  { id: "red",      label: "🌐 IP LOOKUP",     placeholder: "8.8.8.8  or  2001:4860:4860::8888"   },
 ];
 
-const MODE_COLOURS: Record<Mode, { active: string; icon: string }> = {
-  consumer: { active: "border-indigo-500/60 bg-indigo-500/10 shadow-[0_0_24px_rgba(99,102,241,0.12)]", icon: "text-indigo-400 bg-indigo-500/15 border-indigo-500/25" },
-  blue:     { active: "border-blue-500/60 bg-blue-500/10 shadow-[0_0_24px_rgba(59,130,246,0.12)]",   icon: "text-blue-400 bg-blue-500/15 border-blue-500/25" },
-  red:      { active: "border-rose-500/60 bg-rose-500/10 shadow-[0_0_24px_rgba(244,63,94,0.12)]",    icon: "text-rose-400 bg-rose-500/15 border-rose-500/25" },
-};
+const DEPTHS: { id: Depth; label: string }[] = [
+  { id: "quick",    label: "QUICK"      },
+  { id: "standard", label: "STANDARD"   },
+  { id: "deep",     label: "DEEP OSINT" },
+];
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-type HistoryEntry = LookupResult & { queriedAt: string };
+type AnyResult = LookupResult | IpLookupResult;
+type HistoryEntry = AnyResult & { queriedAt: string };
 
-function riskClasses(risk: RiskLevel): string {
-  switch (risk) {
-    case "High":   return "risk-high";
-    case "Medium": return "risk-medium";
-    case "Low":    return "risk-low";
-    default:       return "risk-unknown";
-  }
-}
-
-function riskDot(risk: RiskLevel): string {
-  switch (risk) {
-    case "High":   return "bg-red-400";
-    case "Medium": return "bg-orange-400";
-    case "Low":    return "bg-green-400";
-    default:       return "bg-slate-400";
-  }
-}
-
-type FlagSeverity = "danger" | "warning" | "safe";
+type FlagSeverity = "danger" | "warning" | "safe" | "info";
 
 const DANGER_WORDS = [
-  "scam", "fraud", "malicious", "reported", "dangerous", "illegal",
-  "phishing", "vishing", "smishing", "blacklist", "blacklisted",
-  "criminal", "threatening", "extortion", "impersonat",
+  "scam","fraud","malicious","reported","dangerous","illegal",
+  "phishing","vishing","smishing","blacklist","blacklisted",
+  "criminal","threatening","extortion","impersonat","tor","malware",
 ];
 const WARNING_WORDS = [
-  "premium", "voip", "unknown", "unverified", "spoofable", "caution",
-  "potential", "risk", "suspicious", "unconfirmed", "questionable",
-  "unusual", "offshore", "anonymous", "untraceable",
+  "premium","voip","unknown","unverified","spoofable","caution",
+  "potential","risk","suspicious","unconfirmed","questionable",
+  "unusual","offshore","anonymous","untraceable","vpn","proxy","hosting","datacenter",
 ];
 
 function classifyFlag(flag: string): FlagSeverity {
@@ -105,127 +63,134 @@ function classifyFlag(flag: string): FlagSeverity {
   return "safe";
 }
 
-const FLAG_STYLES: Record<FlagSeverity, {
-  wrapper: string;
-  icon: string;
-  iconColor: string;
-  labelColor: string;
-  label: string;
-}> = {
-  danger: {
-    wrapper:    "border-l-2 border-l-red-500 border border-red-500/20 bg-red-500/10 text-red-200",
-    icon:       "⚠",
-    iconColor:  "text-red-400",
-    labelColor: "text-red-400",
-    label:      "danger",
-  },
-  warning: {
-    wrapper:    "border-l-2 border-l-amber-400 border border-amber-400/20 bg-amber-400/10 text-amber-100",
-    icon:       "⚡",
-    iconColor:  "text-amber-400",
-    labelColor: "text-amber-400",
-    label:      "warning",
-  },
-  safe: {
-    wrapper:    "border-l-2 border-l-emerald-500 border border-emerald-500/20 bg-emerald-500/5 text-emerald-200",
-    icon:       "✓",
-    iconColor:  "text-emerald-400",
-    labelColor: "text-emerald-400",
-    label:      "safe",
-  },
+const FLAG_CONFIG: Record<FlagSeverity, { icon: string; cls: string; labelCls: string; label: string }> = {
+  danger:  { icon: "🔴", cls: "border-[rgba(255,60,90,0.2)]  bg-[rgba(255,60,90,0.06)]",    labelCls: "text-[#ff3c5a]", label: "DANGER"  },
+  warning: { icon: "🟡", cls: "border-[rgba(255,184,0,0.2)]  bg-[rgba(255,184,0,0.06)]",    labelCls: "text-[#ffb800]", label: "WARNING" },
+  safe:    { icon: "🟢", cls: "border-[rgba(0,255,136,0.15)] bg-[rgba(0,255,136,0.04)]",    labelCls: "text-[#00ff88]", label: "SAFE"    },
+  info:    { icon: "ℹ️",  cls: "border-[rgba(100,150,255,0.2)] bg-[rgba(100,150,255,0.05)]", labelCls: "text-[#6496ff]", label: "INFO"    },
 };
 
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-function RiskBadge({ risk }: { risk: RiskLevel }) {
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded border text-xs font-mono-num font-semibold tracking-widest uppercase ${riskClasses(risk)}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${riskDot(risk)}`} />
-      {risk}
-    </span>
-  );
+function riskColour(risk: RiskLevel) {
+  switch (risk) {
+    case "High":   return { text: "text-[#ff3c5a]", border: "border-[rgba(255,60,90,0.4)]",   bg: "bg-[rgba(255,60,90,0.08)]",   icon: "🚨", label: "HIGH RISK"    };
+    case "Medium": return { text: "text-[#ffb800]", border: "border-[rgba(255,184,0,0.4)]",   bg: "bg-[rgba(255,184,0,0.08)]",   icon: "⚠️", label: "MEDIUM RISK"  };
+    case "Low":    return { text: "text-[#00ff88]", border: "border-[rgba(0,255,136,0.3)]",   bg: "bg-[rgba(0,255,136,0.06)]",   icon: "✅", label: "LOW RISK"     };
+    default:       return { text: "text-[#6496ff]", border: "border-[rgba(100,150,255,0.3)]", bg: "bg-[rgba(100,150,255,0.06)]", icon: "❓", label: "UNKNOWN RISK" };
+  }
 }
 
-function PillBadge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-slate-700/50 bg-slate-800/50 text-[10px] font-mono-num text-slate-400 tracking-wide">
-      {children}
-    </span>
-  );
+function flagEmoji(countryCode: string | null): string {
+  if (!countryCode || countryCode.length !== 2) return "🌐";
+  return countryCode
+    .toUpperCase()
+    .split("")
+    .map(c => String.fromCodePoint(0x1f1e0 + c.charCodeAt(0) - 65))
+    .join("");
 }
 
-function MetaGrid({ result }: { result: LookupResult }) {
-  const items = [
-    { label: "Country",  value: result.parsed.country  ?? "—" },
-    { label: "Region",   value: result.parsed.region   ?? "—" },
-    { label: "Type",     value: result.parsed.type },
-    { label: "Valid",    value: result.parsed.valid ? "Yes" : "No" },
-    { label: "E.164",    value: result.parsed.e164     ?? "—" },
-    { label: "Mode",     value: result.mode },
-  ];
+function isValidIp(s: string): boolean {
+  const ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+  const ipv6 = /^[0-9a-fA-F:]{2,45}$/;
+  return ipv4.test(s) || ipv6.test(s);
+}
+
+// ---------------------------------------------------------------------------
+// Shared micro-components
+// ---------------------------------------------------------------------------
+
+function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-slate-700/20 rounded-lg overflow-hidden border border-slate-700/30">
-      {items.map(({ label, value }) => (
-        <div key={label} className="bg-[#0e1117] px-4 py-3">
-          <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">{label}</div>
-          <div className="font-mono-num text-sm text-slate-200 truncate">{value}</div>
-        </div>
-      ))}
+    <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-2.5 uppercase">
+      {"// "}{children}
     </div>
   );
 }
 
-function AnalysisExpander({ text }: { text: string }) {
-  const [expanded, setExpanded] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
+function InfoCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3">
+      <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">{label}</div>
+      <div className="font-head font-semibold text-[15px] text-white break-words leading-tight">{value}</div>
+    </div>
+  );
+}
 
-  useLayoutEffect(() => {
-    if (contentRef.current) setHeight(contentRef.current.scrollHeight);
+// ---------------------------------------------------------------------------
+// Copy / Share
+// ---------------------------------------------------------------------------
+
+function useCopyButton(getText: () => string) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(getText()).then(() => {
+      setCopied(true);
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 2000);
+    });
+  }, [getText]);
+  return { copied, copy };
+}
+
+function CopyBtn({ label, getText }: { label: string; getText: () => string }) {
+  const { copied, copy } = useCopyButton(getText);
+  return (
+    <button
+      onClick={copy}
+      className={`font-mono text-[11px] tracking-[2px] px-3 py-1.5 border rounded-sm transition-all duration-150 ${
+        copied
+          ? "border-[var(--accent)] text-[var(--accent)]"
+          : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+      }`}
+    >
+      {copied ? "✓ COPIED" : label}
+    </button>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Analysis expander
+// ---------------------------------------------------------------------------
+
+function AnalysisExpander({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const ref  = useRef<HTMLDivElement>(null);
+  const [h, setH] = useState(0);
+
+  useEffect(() => {
+    if (ref.current) setH(ref.current.scrollHeight);
   }, [text]);
 
-  const displayText = text.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
-  const paragraphs  = displayText.split(/\n{2,}/).map(p => p.replace(/\n/g, " ").trim()).filter(Boolean);
-  const preview     = paragraphs[0] ?? displayText.slice(0, 120);
+  const clean = text.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
+  const paras = clean.split(/\n{2,}/).map(p => p.replace(/\n/g, " ").trim()).filter(Boolean);
+  const preview = paras[0] ?? clean.slice(0, 120);
 
   return (
-    <div className="rounded-lg border border-slate-700/50 overflow-hidden">
-      {/* Toggle button — visible, bordered, chevron rotates */}
+    <div className="border border-[var(--border)] rounded-sm overflow-hidden">
       <button
-        onClick={() => setExpanded(v => !v)}
-        className={`w-full flex items-center justify-between px-4 py-3 text-left transition-colors duration-150 ${
-          expanded ? "bg-slate-800/70 border-b border-slate-700/40" : "bg-slate-800/40 hover:bg-slate-800/60"
-        }`}
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 bg-[#070910] hover:bg-[#0d1117] transition-colors text-left"
       >
-        <div className="flex items-center gap-2.5">
-          <svg
-            className={`w-4 h-4 text-indigo-400 transition-transform duration-300 ${expanded ? "rotate-90" : "rotate-0"}`}
-            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-xs font-semibold text-slate-200 tracking-wide">Full AI Analysis</span>
-        </div>
-        <span className="text-[10px] font-mono-num text-slate-500">
-          {expanded ? "collapse" : `${paragraphs.length} section${paragraphs.length !== 1 ? "s" : ""}`}
+        <span className="font-mono text-[11px] tracking-[2px] text-[var(--accent)] flex items-center gap-2">
+          <span className={`transition-transform duration-300 inline-block ${open ? "rotate-90" : ""}`}>▶</span>
+          {"// FULL AI ANALYSIS"}
+        </span>
+        <span className="font-mono text-[10px] text-[var(--muted)]">
+          {open ? "COLLAPSE" : `${paras.length} SECTION${paras.length !== 1 ? "S" : ""}`}
         </span>
       </button>
 
-      {/* One-line preview with fade */}
-      {!expanded && (
-        <div className="relative px-4 py-2.5 bg-slate-900/20">
-          <p className="text-xs text-slate-500 leading-relaxed truncate pr-10">{preview}</p>
-          <div className="absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-[#0e1117] to-transparent pointer-events-none" />
+      {!open && (
+        <div className="relative px-4 py-2.5 bg-[var(--surface)]">
+          <p className="font-mono text-[11px] text-[var(--muted)] truncate pr-8 leading-relaxed">{preview}</p>
+          <div className="absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-[#0f1318] to-transparent pointer-events-none" />
         </div>
       )}
 
-      {/* Height-animated expanded body */}
-      <div style={{ height: expanded ? height : 0, transition: "height 320ms cubic-bezier(0.4,0,0.2,1)", overflow: "hidden" }}>
-        <div ref={contentRef} className="px-4 py-4 bg-slate-900/20 space-y-3">
-          {paragraphs.map((para, i) => (
-            <p key={i} className="text-xs text-slate-400 leading-relaxed">{para}</p>
+      <div style={{ height: open ? h : 0, transition: "height 280ms cubic-bezier(0.4,0,0.2,1)", overflow: "hidden" }}>
+        <div ref={ref} className="px-4 py-4 bg-[var(--surface)] space-y-3 border-t border-[var(--border)]">
+          {paras.map((p, i) => (
+            <p key={i} className="font-mono text-[12px] text-[var(--text)] leading-relaxed">{p}</p>
           ))}
         </div>
       </div>
@@ -233,158 +198,326 @@ function AnalysisExpander({ text }: { text: string }) {
   );
 }
 
-function useCopyButton(getText: () => string) {
-  const [copied, setCopied] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const copy = useCallback(() => {
-    navigator.clipboard.writeText(getText()).then(() => {
-      setCopied(true);
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => setCopied(false), 2000);
-    });
-  }, [getText]);
-  return { copied, copy };
-}
+// ---------------------------------------------------------------------------
+// Flags list (shared)
+// ---------------------------------------------------------------------------
 
-function CopyButton({ label, getText }: { label: string; getText: () => string }) {
-  const { copied, copy } = useCopyButton(getText);
+function FlagsList({ flags }: { flags: string[] }) {
+  if (flags.length === 0) return null;
   return (
-    <button
-      onClick={copy}
-      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-mono-num transition-all duration-150 ${
-        copied
-          ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-          : "border-slate-600/50 bg-slate-800/40 text-slate-400 hover:border-slate-500/60 hover:text-slate-200 hover:bg-slate-700/40"
-      }`}
-    >
-      {copied ? (
-        <>
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
-          Copied
-        </>
-      ) : (
-        <>
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <rect x="9" y="9" width="13" height="13" rx="2" strokeLinecap="round" strokeLinejoin="round" />
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-          </svg>
-          {label}
-        </>
-      )}
-    </button>
-  );
-}
-
-function ResultCard({ result }: { result: LookupResult }) {
-  const displayNumber = result.parsed.internationalFormat ?? result.parsed.raw;
-  const cleanAnalysis = result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
-
-  const getReportText = useCallback(() =>
-    ["PhoneScan Report", `${displayNumber} — ${result.risk} Risk`, result.summary, "",
-     "Findings:", ...result.flags.map(f => `• ${f}`), "", "Analysis:", cleanAnalysis].join("\n"),
-    [displayNumber, result.risk, result.summary, result.flags, cleanAnalysis]
-  );
-
-  const getShareText = useCallback(() =>
-    `${displayNumber} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
-    [displayNumber, result.risk, result.summary]
-  );
-
-  return (
-    <div className="rounded-xl border border-slate-700/50 bg-[#0e1117] overflow-hidden terminal-glow">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-700/40 bg-slate-800/20">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="font-mono-num text-lg text-indigo-300 tracking-wide truncate">
-            {displayNumber}
-          </span>
-          <RiskBadge risk={result.risk} />
-        </div>
-        <div className="flex items-center gap-2 shrink-0 ml-3">
-          <CopyButton label="Copy"  getText={getReportText} />
-          <CopyButton label="Share" getText={getShareText}  />
-          <PillBadge>{result.depth}</PillBadge>
-          <PillBadge>{result.mode}</PillBadge>
-        </div>
-      </div>
-
-      <div className="p-5 space-y-5">
-        {/* Summary */}
-        <p className="text-slate-300 text-sm leading-relaxed border-l-2 border-indigo-500/50 pl-4">
-          {result.summary}
-        </p>
-
-        {/* Meta grid */}
-        <MetaGrid result={result} />
-
-        {/* Flags */}
-        {result.flags.length > 0 && (
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-2.5">
-              Intelligence Flags
+    <div>
+      <SectionLabel>RISK INDICATORS</SectionLabel>
+      <div className="flex flex-col gap-1.5">
+        {flags.map((flag, i) => {
+          const sev = classifyFlag(flag);
+          const cfg = FLAG_CONFIG[sev];
+          return (
+            <div
+              key={i}
+              className={`flex items-start gap-3 px-3.5 py-2.5 border rounded-sm text-[14px] font-head leading-snug ${cfg.cls}`}
+            >
+              <span className="shrink-0 text-base leading-none mt-px">{cfg.icon}</span>
+              <span className="flex-1 min-w-0 text-[var(--text)]">{flag}</span>
+              <span className={`shrink-0 font-mono text-[9px] tracking-[2px] self-center ${cfg.labelCls}`}>
+                {cfg.label}
+              </span>
             </div>
-            <div className="space-y-2">
-              {result.flags.map((flag, i) => {
-                const severity = classifyFlag(flag);
-                const style    = FLAG_STYLES[severity];
-                return (
-                  <div
-                    key={i}
-                    className={`flex items-start gap-2.5 px-3.5 py-2.5 rounded-r-lg text-xs leading-relaxed ${style.wrapper}`}
-                  >
-                    <span className={`shrink-0 text-sm leading-none mt-px font-bold ${style.iconColor}`}>
-                      {style.icon}
-                    </span>
-                    <span className="flex-1 min-w-0">{flag}</span>
-                    <span className={`shrink-0 self-center font-mono-num text-[9px] uppercase tracking-widest ${style.labelColor}`}>
-                      {style.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Full AI analysis expandable */}
-        <AnalysisExpander text={result.raw} />
+          );
+        })}
       </div>
     </div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Phone result card
+// ---------------------------------------------------------------------------
+
+function ResultCard({ result }: { result: LookupResult }) {
+  const displayNum    = result.parsed.internationalFormat ?? result.parsed.raw;
+  const cleanAnalysis = result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
+  const rc = riskColour(result.risk);
+
+  const getReport = useCallback(() =>
+    ["PhoneScan Report", `${displayNum} — ${result.risk} Risk`, result.summary, "",
+     "Findings:", ...result.flags.map(f => `• ${f}`), "", "Analysis:", cleanAnalysis].join("\n"),
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const getShare = useCallback(() =>
+    `${displayNum} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const metaItems = [
+    { label: "NUMBER",    value: displayNum },
+    { label: "COUNTRY",   value: result.parsed.region ?? "—" },
+    { label: "CODE",      value: result.parsed.country ?? "—" },
+    { label: "LINE TYPE", value: result.parsed.type.toUpperCase() },
+    { label: "E.164",     value: result.parsed.e164 ?? "—" },
+    { label: "VALID",     value: result.parsed.valid ? "YES ✓" : "NO ✗" },
+    { label: "DEPTH",     value: result.depth.toUpperCase() },
+    { label: "MODE",      value: result.mode.toUpperCase() },
+  ];
+
+  return (
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
+              ANALYSIS COMPLETE
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">libphonenumber + groq</span>
+            </div>
+            <div className="font-mono text-xl text-white tracking-[2px] break-all">{displayNum}</div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <CopyBtn label="COPY"  getText={getReport} />
+            <CopyBtn label="SHARE" getText={getShare}  />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-3xl leading-none">{rc.icon}</span>
+          <div>
+            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {metaItems.map(({ label, value }) => (
+            <InfoCell key={label} label={label} value={value} />
+          ))}
+        </div>
+
+        <FlagsList flags={result.flags} />
+
+        <div>
+          <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
+          <AnalysisExpander text={result.raw} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// IP result card
+// ---------------------------------------------------------------------------
+
+function ThreatBar({ score }: { score: number | null }) {
+  if (score === null) return null;
+  const pct = Math.min(100, Math.max(0, score));
+  const colour = pct >= 61 ? "#ff3c5a" : pct >= 31 ? "#ffb800" : "#00ff88";
+  return (
+    <div>
+      <div className="flex justify-between mb-1.5">
+        <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] uppercase">Threat Score</span>
+        <span className="font-mono text-[11px] tracking-[1px]" style={{ color: colour }}>
+          {score}/100
+        </span>
+      </div>
+      <div className="h-[6px] bg-[#070910] rounded-full border border-[var(--border)] overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, background: colour, boxShadow: `0 0 6px ${colour}` }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="font-mono text-[9px] text-[var(--muted)]">CLEAN</span>
+        <span className="font-mono text-[9px] text-[var(--muted)]">MALICIOUS</span>
+      </div>
+    </div>
+  );
+}
+
+function IndicatorPill({ label, active, colour }: { label: string; active: boolean; colour: string }) {
+  return (
+    <div
+      className={`font-mono text-[10px] tracking-[2px] px-3 py-1.5 border rounded-sm transition-all ${
+        active ? "" : "opacity-30"
+      }`}
+      style={active ? { borderColor: `${colour}55`, background: `${colour}12`, color: colour } : { borderColor: "var(--border)", color: "var(--muted)" }}
+    >
+      {active ? "● " : "○ "}{label}
+    </div>
+  );
+}
+
+function IpResultCard({ result }: { result: IpLookupResult }) {
+  const rc = riskColour(result.risk);
+  const flag = flagEmoji(result.countryCode);
+  const locationStr = [result.city, result.region, result.country].filter(Boolean).join(", ") || "Unknown";
+
+  const getReport = useCallback(() =>
+    [
+      "PhoneScan IP Report",
+      `${result.ip} — ${result.risk} Risk`,
+      result.summary,
+      "",
+      `Location: ${locationStr}`,
+      result.isp    ? `ISP: ${result.isp}` : null,
+      result.asn    ? `ASN: ${result.asn}` : null,
+      `VPN: ${result.is_vpn} | Proxy: ${result.is_proxy} | Tor: ${result.is_tor} | Hosting: ${result.is_hosting}`,
+      result.threat_score !== null ? `Threat Score: ${result.threat_score}/100` : null,
+      "",
+      "Findings:",
+      ...result.flags.map(f => `• ${f}`),
+      "",
+      "Analysis:",
+      result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
+    ].filter(s => s !== null).join("\n"),
+    [result]
+  );
+  const getShare = useCallback(() =>
+    `${result.ip} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+    [result]
+  );
+
+  const metaItems = [
+    { label: "IP ADDRESS", value: result.ip },
+    { label: "COUNTRY",    value: result.country ?? "—" },
+    { label: "CITY",       value: result.city ?? "—" },
+    { label: "REGION",     value: result.region ?? "—" },
+    { label: "ISP",        value: result.isp ?? "—" },
+    { label: "ASN",        value: result.asn ?? "—" },
+    { label: "TIMEZONE",   value: result.timezone ?? "—" },
+    { label: "DEPTH",      value: result.depth.toUpperCase() },
+  ];
+
+  return (
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
+              IP ANALYSIS COMPLETE
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">ip-api · ipapi.is · groq</span>
+            </div>
+            <div className="font-mono text-xl text-white tracking-[2px] break-all">{result.ip}</div>
+            <div className="font-mono text-[12px] text-[var(--muted)] mt-1">
+              {flag} {locationStr}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <CopyBtn label="COPY"  getText={getReport} />
+            <CopyBtn label="SHARE" getText={getShare}  />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        {/* Risk banner */}
+        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-3xl leading-none">{rc.icon}</span>
+          <div>
+            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+          </div>
+        </div>
+
+        {/* Map */}
+        {result.lat !== null && result.lon !== null && (
+          <div className="overflow-hidden rounded-sm border border-[var(--border)]">
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] px-4 py-2 border-b border-[var(--border)] bg-[#070910]">
+              {"// APPROXIMATE LOCATION · "}{result.city ?? "UNKNOWN"}{result.region ? `, ${result.region}` : ""}{result.country ? ` · ${result.country}` : ""}
+            </div>
+            <IpMap
+              lat={result.lat}
+              lon={result.lon}
+              city={result.city}
+              region={result.region}
+              country={result.country}
+            />
+          </div>
+        )}
+
+        {/* Anonymisation indicators */}
+        <div>
+          <SectionLabel>ANONYMISATION DETECTION</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            <IndicatorPill label="VPN"            active={result.is_vpn}     colour="#ffb800" />
+            <IndicatorPill label="PROXY"          active={result.is_proxy}   colour="#ffb800" />
+            <IndicatorPill label="TOR EXIT NODE"  active={result.is_tor}     colour="#ff3c5a" />
+            <IndicatorPill label="HOSTING / DC"   active={result.is_hosting} colour="#6496ff" />
+          </div>
+        </div>
+
+        {/* Threat score */}
+        {result.threat_score !== null && (
+          <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3.5">
+            <ThreatBar score={result.threat_score} />
+          </div>
+        )}
+
+        {/* Info grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {metaItems.map(({ label, value }) => (
+            <InfoCell key={label} label={label} value={value} />
+          ))}
+        </div>
+
+        {/* Flags */}
+        <FlagsList flags={result.flags} />
+
+        {/* AI analysis */}
+        <div>
+          <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
+          <AnalysisExpander text={result.raw} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// History
+// ---------------------------------------------------------------------------
+
 function HistoryPanel({ history, onReplay }: { history: HistoryEntry[]; onReplay: (n: string) => void }) {
   if (history.length === 0) return null;
   return (
-    <div className="rounded-xl border border-slate-700/40 bg-[#0e1117]/60 overflow-hidden">
-      <div className="px-5 py-3 border-b border-slate-700/30 flex items-center gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-slate-500 font-syne">Recent Lookups</span>
-        <span className="text-[10px] font-mono-num text-slate-600">({history.length})</span>
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      <div className="px-5 py-3 border-b border-[var(--border)]">
+        <span className="font-mono text-[10px] tracking-[3px] text-[var(--muted)]">
+          {"// RECENT LOOKUPS ("}{history.length}{")"}
+        </span>
       </div>
-      <div className="divide-y divide-slate-700/20">
-        {history.map((entry, i) => (
-          <button
-            key={i}
-            onClick={() => onReplay(entry.parsed.raw)}
-            className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-slate-800/30 transition-colors text-left group"
-          >
-            <div className="flex items-center gap-3 min-w-0">
-              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${riskDot(entry.risk)}`} />
-              <span className="font-mono-num text-sm text-slate-300 group-hover:text-indigo-300 transition-colors truncate">
-                {entry.parsed.internationalFormat ?? entry.parsed.raw}
-              </span>
-              <span className="text-[10px] text-slate-600 shrink-0">{entry.mode}</span>
-            </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className={`text-[10px] font-mono-num px-1.5 py-0.5 rounded border ${riskClasses(entry.risk)}`}>
-                {entry.risk}
-              </span>
-              <span className="text-[10px] text-slate-600 font-mono-num">{entry.queriedAt}</span>
-            </div>
-          </button>
-        ))}
+      <div className="divide-y divide-[var(--border)]">
+        {history.map((entry, i) => {
+          const rc = riskColour(entry.risk);
+          const isIp = "ip" in entry;
+          const displayVal = isIp
+            ? (entry as IpLookupResult).ip
+            : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
+          const raw = isIp ? (entry as IpLookupResult).ip : (entry as LookupResult).parsed.raw;
+          return (
+            <button
+              key={i}
+              onClick={() => onReplay(raw)}
+              className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-[#0d1117] transition-colors text-left group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="font-mono text-[10px] text-[var(--muted)]">{String(i + 1).padStart(2, "0")}</span>
+                <span className={`font-mono text-[13px] tracking-wide group-hover:text-[var(--accent)] transition-colors truncate ${rc.text}`}>
+                  {displayVal}
+                </span>
+                <span className="font-mono text-[10px] text-[var(--muted)] shrink-0">
+                  {isIp ? "IP" : (entry as LookupResult).mode.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <span className={`font-mono text-[10px] tracking-[2px] px-2 py-0.5 border rounded-sm ${rc.text} ${rc.border}`}>
+                  {entry.risk.toUpperCase()}
+                </span>
+                <span className="font-mono text-[10px] text-[var(--muted)]">{entry.queriedAt}</span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -399,7 +532,7 @@ export default function Home() {
   const [mode,      setMode]      = useState<Mode>("consumer");
   const [depth,     setDepth]     = useState<Depth>("standard");
   const [loading,   setLoading]   = useState(false);
-  const [result,    setResult]    = useState<LookupResult | null>(null);
+  const [result,    setResult]    = useState<AnyResult | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [history,   setHistory]   = useState<HistoryEntry[]>([]);
@@ -408,276 +541,284 @@ export default function Home() {
   const lookup = useCallback(async (raw?: string) => {
     const target = (raw ?? number).trim();
     if (!target) return;
+
+    // IP mode validation
+    if (mode === "red" && !isValidIp(target)) {
+      setError("Invalid IP address. Please enter a valid IPv4 (e.g. 8.8.8.8) or IPv6 address.");
+      return;
+    }
+
     setLoading(true); setError(null); setResult(null);
     try {
-      const res  = await fetch("/api/lookup", {
+      const endpoint = mode === "red" ? "/api/iplookup" : "/api/lookup";
+      const body = mode === "red"
+        ? { ip: target, depth }
+        : { number: target, mode, depth };
+
+      const res  = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ number: target, mode, depth }),
+        body: JSON.stringify(body),
       });
       const rem = res.headers.get("X-RateLimit-Remaining");
       if (rem !== null) setRemaining(parseInt(rem, 10));
-      const data = await res.json();
-      if (!res.ok) { setError(data.error ?? "Something went wrong."); return; }
+      const data = await res.json() as AnyResult;
+      if (!res.ok) {
+        const errData = data as unknown as { error?: string };
+        setError(errData.error ?? "Something went wrong.");
+        return;
+      }
       setResult(data);
       setHistory(prev => [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 10));
     } catch {
-      setError("Network error — please check your connection and try again.");
+      setError("Network error — check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }, [number, mode, depth]);
 
+  const fetchMyIp = useCallback(async () => {
+    try {
+      const res = await fetch("https://api.ipify.org?format=json");
+      const { ip } = await res.json() as { ip: string };
+      setNumber(ip);
+    } catch {
+      setError("Could not detect your IP address.");
+    }
+  }, []);
+
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const h = (e: KeyboardEvent) => {
       if (e.key === "Enter" && document.activeElement === inputRef.current) lookup();
     };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
   }, [lookup]);
 
   return (
-    <div className="min-h-screen bg-[#0a0b0d] text-slate-200">
-      {/* Global grid overlay */}
-      <div
-        className="fixed inset-0 pointer-events-none opacity-[0.025]"
-        style={{
-          backgroundImage: "linear-gradient(#6366f1 1px, transparent 1px), linear-gradient(90deg, #6366f1 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
-
-      <div className="relative max-w-[900px] mx-auto px-6 py-10 space-y-8">
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Nav header                                                       */}
-        {/* ---------------------------------------------------------------- */}
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 text-sm select-none">
-              ⌖
-            </div>
-            <span className="font-syne text-xl font-bold tracking-tight text-white">PhoneScan</span>
-            <span className="text-slate-700 text-sm hidden sm:block">·</span>
-            <span className="text-slate-500 text-sm hidden sm:block">
-              Powered by <span className="text-indigo-400/80">Groq AI</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4">
-            {remaining !== null && (
-              <div className="flex items-center gap-1.5 text-[11px] font-mono-num text-slate-500">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-400/70" />
-                {remaining} lookups remaining today
-              </div>
-            )}
-            <a
-              href="https://github.com/rawchain"
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate-500 hover:text-white transition-colors duration-150"
-              aria-label="GitHub"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
-              </svg>
-            </a>
-          </div>
-        </header>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Hero                                                             */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="relative rounded-xl overflow-hidden border border-slate-800/50 px-6 py-6">
-          {/* Scanline texture */}
-          <div
-            className="absolute inset-0 pointer-events-none opacity-[0.035]"
-            style={{ backgroundImage: "repeating-linear-gradient(0deg,#e2e8f0 0px,#e2e8f0 1px,transparent 1px,transparent 4px)" }}
-          />
-          {/* Radial accent */}
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(ellipse_55%_100%_at_20%_50%,rgba(99,102,241,0.07),transparent)]" />
-          <div className="relative">
-            <h2 className="font-syne text-[2rem] font-extrabold tracking-tight text-white leading-tight mb-2">
-              Who just called you?
-              <span
-                className="inline-block w-[3px] h-[0.9em] ml-2 align-middle bg-indigo-400"
-                style={{ animation: "blink 1s step-end infinite" }}
-              />
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Free AI-powered phone intelligence —{" "}
-              <span className="text-slate-300">scam detection</span>,{" "}
-              <span className="text-slate-300">security research</span> and{" "}
-              <span className="text-slate-300">OSINT</span> in seconds.
-            </p>
-          </div>
+    <div
+      className="min-h-screen flex flex-col items-center px-4 py-10"
+      style={{
+        background: `
+          radial-gradient(ellipse at 20% 0%,   rgba(0,255,136,0.04) 0%, transparent 60%),
+          radial-gradient(ellipse at 80% 100%, rgba(255,60,90,0.04)  0%, transparent 60%),
+          repeating-linear-gradient(0deg,   transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
+          repeating-linear-gradient(90deg,  transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
+          #0a0c10
+        `,
+      }}
+    >
+      {/* Header */}
+      <header className="text-center mb-8 w-full max-w-[700px]">
+        <div className="font-mono text-[11px] tracking-[6px] text-[var(--accent)] opacity-70 mb-2">
+          {"// PHONESCAN //"}
         </div>
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Mode cards                                                       */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="grid grid-cols-3 gap-4">
-          {MODES.map(m => {
-            const active  = mode === m.id;
-            const colours = MODE_COLOURS[m.id];
-            return (
-              <button
-                key={m.id}
-                onClick={() => setMode(m.id)}
-                className={`rounded-xl border p-4 text-left transition-all duration-200 ${
-                  active
-                    ? colours.active
-                    : "border-slate-700/40 bg-slate-800/20 hover:border-slate-600/50 hover:bg-slate-800/40"
-                }`}
-              >
-                {/* Icon box */}
-                <div className={`w-9 h-9 rounded-lg border flex items-center justify-center mb-3 transition-colors ${
-                  active ? colours.icon : "text-slate-500 bg-slate-800/50 border-slate-700/40"
-                }`}>
-                  {m.icon}
-                </div>
-                <div className={`font-syne text-sm font-semibold mb-1 ${active ? "text-white" : "text-slate-300"}`}>
-                  {m.label}
-                </div>
-                <div className="text-[11px] text-slate-500 leading-snug">{m.desc}</div>
-              </button>
-            );
-          })}
+        <h1
+          className="font-head font-bold text-white tracking-[2px] leading-none"
+          style={{ fontSize: "clamp(2rem,5vw,3.2rem)" }}
+        >
+          PHONE <span style={{ color: "var(--accent)", textShadow: "0 0 30px rgba(0,255,136,0.5)" }}>SCAN</span>
+        </h1>
+        <div className="font-mono text-[11px] tracking-[3px] text-[var(--muted)] mt-2">
+          AI-POWERED PHONE &amp; IP INTELLIGENCE · POWERED BY GROQ
         </div>
+        {remaining !== null && (
+          <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mt-1.5 opacity-60">
+            {remaining} LOOKUPS REMAINING TODAY
+          </div>
+        )}
+      </header>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Phone input + depth + examples                                   */}
-        {/* ---------------------------------------------------------------- */}
-        <div className="space-y-3">
-          {/* Input row — 52px tall */}
-          <div className="relative flex items-center">
-            {/* Phone icon */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-              </svg>
-            </div>
+      {/* Tab bar */}
+      <div className="flex w-full max-w-[700px]">
+        {MODES.map((m, i) => (
+          <button
+            key={m.id}
+            onClick={() => { setMode(m.id); setResult(null); setError(null); }}
+            className={`flex-1 py-3 font-head font-bold text-[13px] tracking-[2px] border transition-all duration-150 ${
+              i === 0 ? "rounded-tl-sm" : ""
+            } ${
+              i === MODES.length - 1 ? "rounded-tr-sm border-l-0" : i > 0 ? "border-l-0" : ""
+            } ${
+              mode === m.id
+                ? "text-[var(--accent)] border-[var(--border)] bg-[var(--surface)]"
+                : "text-[var(--muted)] border-[var(--border)] bg-[var(--surface)] hover:bg-[#141a22]"
+            }`}
+            style={mode === m.id ? { borderBottomColor: "var(--surface)" } : {}}
+          >
+            {m.label}
+          </button>
+        ))}
+        {/* GitHub link */}
+        <a
+          href="https://github.com/rawchain"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="GitHub"
+          className="flex items-center px-4 border border-l-0 border-[var(--border)] bg-[var(--surface)] rounded-tr-sm text-[var(--muted)] hover:text-white transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+        </a>
+      </div>
+
+      {/* Main card */}
+      <div className="w-full max-w-[700px] border border-[var(--border)] border-t-0 rounded-b-sm bg-[var(--surface)]">
+
+        {/* Input section */}
+        <div className="px-8 pt-7 pb-6 border-b border-[var(--border)]">
+          <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
+            {mode === "red" ? "// ENTER IP ADDRESS (IPv4 or IPv6)" : "// ENTER NUMBER (with country code)"}
+          </span>
+          <div className="flex gap-3">
             <input
               ref={inputRef}
-              type="tel"
+              type={mode === "red" ? "text" : "tel"}
               value={number}
               onChange={e => setNumber(e.target.value)}
-              placeholder="+1 800 555 0123"
-              className="w-full h-[52px] bg-[#0e1117] border border-slate-700/60 rounded-xl pl-11 pr-[140px] font-mono-num text-base text-slate-200 placeholder-slate-700 focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 transition-all"
+              placeholder={MODES.find(m => m.id === mode)?.placeholder ?? "+1 555 123 4567"}
+              maxLength={mode === "red" ? 45 : 20}
+              className="flex-1 bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[16px] tracking-[2px] text-white px-4 py-3.5 outline-none placeholder:text-[var(--muted)] placeholder:text-[13px] transition-all"
+              onFocus={e => {
+                e.currentTarget.style.borderColor = "var(--accent)";
+                e.currentTarget.style.boxShadow   = "0 0 0 1px var(--accent), var(--glow)";
+              }}
+              onBlur={e => {
+                e.currentTarget.style.borderColor = "";
+                e.currentTarget.style.boxShadow   = "";
+              }}
             />
             <button
               onClick={() => lookup()}
               disabled={loading || !number.trim()}
-              className="absolute right-2 h-[38px] px-5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-syne font-semibold transition-colors"
+              className="font-head font-bold text-[14px] tracking-[3px] px-6 rounded-sm text-black whitespace-nowrap transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: "var(--accent)" }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#00ffaa"; e.currentTarget.style.boxShadow = "var(--glow)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
+              onMouseLeave={e => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.transform = ""; }}
             >
-              {loading ? (
-                <span className="flex items-center gap-1.5">
-                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  Scanning
-                </span>
-              ) : "Analyze →"}
+              {loading ? "SCANNING..." : "SCAN"}
             </button>
           </div>
 
-          {/* Depth pills */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">Depth</span>
-            <div className="flex gap-1.5">
-              {DEPTHS.map(d => (
-                <button
-                  key={d.id}
-                  onClick={() => setDepth(d.id)}
-                  title={d.desc}
-                  className={`px-3 py-1 rounded-full text-xs font-mono-num transition-all ${
-                    depth === d.id
-                      ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/40"
-                      : "text-slate-500 border border-slate-700/40 hover:text-slate-300 hover:border-slate-600/50"
-                  }`}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Example chips */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-widest text-slate-600 font-mono-num">Examples</span>
-            {EXAMPLE_NUMBERS.map(ex => (
+          {/* Depth selector */}
+          <div className="flex items-center gap-3 mt-4">
+            <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">DEPTH:</span>
+            {DEPTHS.map(d => (
               <button
-                key={ex.number}
-                onClick={() => { setNumber(ex.number); lookup(ex.number); }}
-                title={ex.note}
-                className="px-2.5 py-1 rounded-md border border-slate-700/40 bg-slate-800/30 hover:bg-slate-700/30 hover:border-slate-600/50 transition-all group"
+                key={d.id}
+                onClick={() => setDepth(d.id)}
+                className={`font-mono text-[10px] tracking-[2px] px-3 py-1 border rounded-sm transition-all ${
+                  depth === d.id
+                    ? "border-[var(--accent)] text-[var(--accent)]"
+                    : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                }`}
               >
-                <span className="font-mono-num text-[11px] text-slate-400 group-hover:text-indigo-300 transition-colors">
-                  {ex.label}
-                </span>
+                {d.label}
               </button>
             ))}
           </div>
-        </div>
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Error                                                            */}
-        {/* ---------------------------------------------------------------- */}
-        {error && (
-          <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 font-mono-num flex items-start gap-2">
-            <span className="mt-0.5 shrink-0">✕</span>
-            {error}
-          </div>
-        )}
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Loading                                                          */}
-        {/* ---------------------------------------------------------------- */}
-        {loading && (
-          <div className="rounded-xl border border-slate-700/40 bg-[#0e1117] p-6 space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
-              <span className="font-mono-num text-sm text-slate-400">
-                Analysing {number} <span className="cursor-blink" />
-              </span>
-            </div>
-            <div className="space-y-2">
-              {["Parsing number metadata", "Querying Groq LLM", "Extracting intelligence"].map((step, i) => (
-                <div key={step} className="flex items-center gap-2 text-[11px] text-slate-600 font-mono-num">
-                  <svg className="w-3 h-3 animate-spin" style={{ animationDelay: `${i * 0.2}s` }} fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                  </svg>
-                  {step}
-                </div>
+          {/* Example chips */}
+          {mode !== "red" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
+              {EXAMPLE_NUMBERS.map(ex => (
+                <button
+                  key={ex.number}
+                  onClick={() => { setNumber(ex.number); lookup(ex.number); }}
+                  title={ex.note}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                >
+                  {ex.label}
+                </button>
               ))}
             </div>
+          )}
+
+          {/* IP mode controls */}
+          {mode === "red" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
+              {EXAMPLE_IPS.map(ex => (
+                <button
+                  key={ex.label}
+                  onClick={() => { setNumber(ex.label); lookup(ex.label); }}
+                  title={ex.note}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                >
+                  {ex.label}
+                </button>
+              ))}
+              <button
+                onClick={fetchMyIp}
+                className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[rgba(0,255,136,0.3)] rounded-sm text-[var(--accent)] opacity-70 hover:opacity-100 hover:border-[var(--accent)] transition-all"
+              >
+                📍 WHAT&apos;S MY IP?
+              </button>
+            </div>
+          )}
+
+          <div className="font-mono text-[11px] text-[var(--muted)] mt-3 opacity-60">
+            AI analysis powered by Groq · llama-3.3-70b-versatile ·{" "}
+            <a href="https://github.com/rawchain" target="_blank" rel="noreferrer"
+               className="text-[var(--accent)] opacity-70 hover:opacity-100 transition-opacity">
+              github.com/rawchain
+            </a>
+          </div>
+        </div>
+
+        {/* Loading bar */}
+        {loading && (
+          <div className="px-8 py-8 text-center border-b border-[var(--border)]">
+            <div className="h-[2px] bg-[var(--border)] rounded-sm overflow-hidden mb-3.5">
+              <div
+                className="h-full rounded-sm"
+                style={{
+                  background: "var(--accent)",
+                  boxShadow: "0 0 10px var(--accent)",
+                  animation: "scan 1.4s ease-in-out infinite",
+                }}
+              />
+            </div>
+            <div
+              className="font-mono text-[12px] tracking-[2px] text-[var(--muted)]"
+              style={{ animation: "pulse-text 1.4s ease-in-out infinite" }}
+            >
+              {mode === "red" ? "QUERYING IP INTELLIGENCE..." : "QUERYING AI INTELLIGENCE..."}
+            </div>
           </div>
         )}
 
-        {/* ---------------------------------------------------------------- */}
-        {/* Result                                                           */}
-        {/* ---------------------------------------------------------------- */}
-        {result && !loading && <ResultCard result={result} />}
+        {/* Error */}
+        {error && !loading && (
+          <div className="mx-8 my-5 px-5 py-4 border border-[rgba(255,60,90,0.3)] bg-[rgba(255,60,90,0.07)] rounded-sm">
+            <span className="font-mono text-[12px] tracking-[1px] text-[#ff3c5a] leading-relaxed">⚠ {error}</span>
+          </div>
+        )}
 
-        {/* ---------------------------------------------------------------- */}
-        {/* History                                                          */}
-        {/* ---------------------------------------------------------------- */}
-        <HistoryPanel history={history} onReplay={num => { setNumber(num); lookup(num); }} />
-
-        {/* ---------------------------------------------------------------- */}
-        {/* Footer                                                           */}
-        {/* ---------------------------------------------------------------- */}
-        <footer className="pt-4 border-t border-slate-800/50">
-          <p className="text-[11px] text-slate-600 leading-relaxed">
-            PhoneScan provides AI-generated intelligence for informational purposes only. Results are not guaranteed to be accurate or complete. Do not use this tool to make legal, financial, or safety decisions. Red Team mode is intended for authorised security research only.
-          </p>
-          <p className="text-[10px] text-slate-700 font-mono-num mt-1.5">
-            PhoneScan · {new Date().getFullYear()} · Rate limited to 20 lookups / 24 h per IP
-          </p>
-        </footer>
-
+        {/* Result */}
+        {result && !loading && (
+          <div className="p-6 border-t border-[var(--border)]">
+            {"ip" in result
+              ? <IpResultCard result={result as IpLookupResult} />
+              : <ResultCard   result={result as LookupResult}   />
+            }
+          </div>
+        )}
       </div>
+
+      {/* History */}
+      {history.length > 0 && (
+        <div className="w-full max-w-[700px] mt-6">
+          <HistoryPanel history={history} onReplay={n => { setNumber(n); lookup(n); }} />
+        </div>
+      )}
+
+      {/* Footer */}
+      <footer className="mt-7 font-mono text-[11px] tracking-[1px] text-[var(--muted)] text-center opacity-50">
+        We are not responsible for how you use this · {new Date().getFullYear()}
+      </footer>
     </div>
   );
 }

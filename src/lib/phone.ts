@@ -31,6 +31,30 @@ export interface LookupResult {
   depth: Depth;
 }
 
+export interface IpLookupResult {
+  ip: string;
+  country: string | null;
+  countryCode: string | null;
+  city: string | null;
+  region: string | null;
+  isp: string | null;
+  org: string | null;
+  asn: string | null;
+  lat: number | null;
+  lon: number | null;
+  timezone: string | null;
+  is_proxy: boolean;
+  is_vpn: boolean;
+  is_hosting: boolean;
+  is_tor: boolean;
+  threat_score: number | null; // 0–100 (from GetIPIntel × 100)
+  risk: RiskLevel;
+  summary: string;
+  flags: string[];
+  raw: string; // raw AI text
+  depth: Depth;
+}
+
 const SUPPORTED_COUNTRIES: CountryCode[] = ["US", "GB", "AU", "DE", "IN", "BR"];
 
 function mapNumberType(type: NumberType | undefined): ParsedNumber["type"] {
@@ -112,10 +136,10 @@ export function getSystemPrompt(mode: Mode): string {
       return `You are a friendly, plain-language scam detection assistant helping everyday people identify whether a phone number that contacted them is safe or suspicious. Explain findings in simple terms anyone can understand — avoid jargon. Be reassuring but honest. Focus on practical advice the person can act on. Never alarm unnecessarily, but always flag genuine red flags clearly.`;
 
     case "blue":
-      return `You are a defensive security analyst working for a corporate security operations centre (SOC). Your role is to assess phone numbers for vishing (voice phishing), smishing, fraud campaigns, and social engineering threats targeting organisations. Provide structured, actionable intelligence suitable for security teams. Reference threat actor TTPs where relevant. Recommend defensive controls and escalation paths. Be precise and evidence-based.`;
+      return `You are a phone number investigation analyst. Your role is to perform a thorough lookup and analysis of any phone number — identifying the carrier, line type, geographic origin, registration patterns, likely use case (personal, business, virtual, etc.), and any associated risk signals. Provide clear, structured intelligence: who likely owns this number, what type of line it is, where it originates, and whether anything about it is unusual or notable. Be factual, detailed, and methodical.`;
 
     case "red":
-      return `You are an OSINT intelligence researcher conducting lawful, authorised reconnaissance. Your role is to extract maximum intelligence value from a phone number — carrier data, geographic attribution, likely registration patterns, associated infrastructure, and potential links to known threat actors or fraud operations. Think like a threat intelligence analyst. Surface connections and hypotheses even when evidence is partial, but clearly label confidence levels. This is for authorised security research only.`;
+      return `You are an IP address OSINT and intelligence analyst. Given an IP address, your role is to determine everything possible about it: geolocation (country, city, region), ISP and organisation, ASN, whether it is a VPN, Tor exit node, proxy, or datacenter/hosting IP, any known threat actor associations, abuse reports, or blacklist status, and an overall risk assessment. Think like a network intelligence researcher. Be thorough, technical, and label confidence levels clearly. This is for authorised security research only.`;
   }
 }
 
@@ -125,6 +149,35 @@ export function buildUserPrompt(
   mode: Mode,
   depth: Depth
 ): string {
+  const jsonInstruction = `\nAt the very end of your response, output the following JSON object on its own line with no surrounding text, code fences, or formatting:\n{"risk":"High|Medium|Low|Unknown","summary":"one sentence risk summary","flags":["finding 1","finding 2","finding 3"]}`;
+
+  // ── IP mode ─────────────────────────────────────────────────────────────────
+  if (mode === "red") {
+    const ipMeta = `IP Address: ${number}`;
+
+    if (depth === "quick") {
+      return `Analyse this IP address in 3 sentences or fewer. State the likely origin and owner, whether it shows any anonymisation or hosting signals, and the overall risk level.\n\n${ipMeta}${jsonInstruction}`;
+    }
+
+    if (depth === "standard") {
+      const sections = ["Geolocation & Owner", "Anonymisation Signals (VPN/Tor/Proxy/Hosting)", "Risk Assessment"];
+      return `Analyse this IP address using the following structured sections: ${sections.join(", ")}. Keep each section concise — 2 to 4 sentences.\n\n${ipMeta}${jsonInstruction}`;
+    }
+
+    // deep
+    const ipSections = [
+      "Geolocation (Country, Region, City)",
+      "ISP, Organisation & ASN",
+      "Anonymisation Detection (VPN / Tor / Proxy / Datacenter)",
+      "Threat Intelligence & Blacklist Status",
+      "Known Associations or Abuse Reports",
+      "Confidence Assessment",
+      "Recommended Next Steps",
+    ];
+    return `Produce a full IP intelligence report. Cover each of the following sections in depth:\n\n${ipSections.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\nTarget:\n${ipMeta}${jsonInstruction}`;
+  }
+
+  // ── Phone modes (consumer + blue) ───────────────────────────────────────────
   const meta = [
     `Number: ${number}`,
     parsed.e164 ? `E.164: ${parsed.e164}` : null,
@@ -136,53 +189,38 @@ export function buildUserPrompt(
     .filter(Boolean)
     .join("\n");
 
-  const jsonInstruction = `\nAt the very end of your response, output the following JSON object on its own line with no surrounding text, code fences, or formatting:\n{"risk":"High|Medium|Low|Unknown","summary":"one sentence risk summary","flags":["finding 1","finding 2","finding 3"]}`;
-
   if (depth === "quick") {
-    return `Analyse this phone number in 3 sentences or fewer. State whether it is likely safe or suspicious, the single biggest risk indicator, and one action the recipient should take.\n\n${meta}${jsonInstruction}`;
+    const task = mode === "consumer"
+      ? "State whether it is likely safe or suspicious, the single biggest risk indicator, and one action the recipient should take."
+      : "Identify the carrier and line type, the likely geographic origin, and any notable characteristics of this number.";
+    return `Analyse this phone number in 3 sentences or fewer. ${task}\n\n${meta}${jsonInstruction}`;
   }
 
   if (depth === "standard") {
-    const sections =
-      mode === "consumer"
-        ? ["Is this number safe?", "Warning signs (if any)", "What should I do?"]
-        : mode === "blue"
-        ? ["Threat Assessment", "Indicators of Compromise", "Recommended Controls"]
-        : ["Attribution", "Intelligence Value", "Associated Patterns"];
-
+    const sections = mode === "consumer"
+      ? ["Is this number safe?", "Warning signs (if any)", "What should I do?"]
+      : ["Number Identity (carrier, line type, origin)", "Notable Characteristics", "Risk or Trust Assessment"];
     return `Analyse this phone number using the following structured sections: ${sections.join(", ")}. Keep each section concise — 2 to 4 sentences.\n\n${meta}${jsonInstruction}`;
   }
 
   // deep
-  const sections =
-    mode === "consumer"
-      ? [
-          "Overview",
-          "Scam Patterns Associated With This Number Type or Region",
-          "Red Flags Detected",
-          "Safe vs Suspicious Indicators",
-          "Recommended Actions",
-          "Additional Resources",
-        ]
-      : mode === "blue"
-      ? [
-          "Executive Summary",
-          "Threat Classification",
-          "TTP Analysis (MITRE ATT&CK if applicable)",
-          "Indicators of Compromise",
-          "Campaign Attribution (if known)",
-          "Defensive Recommendations",
-          "Escalation Criteria",
-        ]
-      : [
-          "OSINT Summary",
-          "Carrier & Infrastructure Analysis",
-          "Geographic & Temporal Attribution",
-          "Known Threat Actor Associations",
-          "Confidence Assessment",
-          "Collection Gaps",
-          "Recommended Next Steps",
-        ];
+  const sections = mode === "consumer"
+    ? [
+        "Overview",
+        "Scam Patterns Associated With This Number Type or Region",
+        "Red Flags Detected",
+        "Safe vs Suspicious Indicators",
+        "Recommended Actions",
+        "Additional Resources",
+      ]
+    : [
+        "Number Identity (carrier, operator, line type)",
+        "Geographic Origin & Registration Patterns",
+        "Likely Use Case (personal, business, virtual, etc.)",
+        "Risk Signals & Unusual Characteristics",
+        "Confidence Assessment",
+        "Recommended Next Steps",
+      ];
 
   return `Produce a full intelligence report on this phone number. Cover each of the following sections in depth:\n\n${sections.map((s, i) => `${i + 1}. ${s}`).join("\n")}\n\nPhone number metadata:\n${meta}${jsonInstruction}`;
 }
