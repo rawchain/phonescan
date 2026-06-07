@@ -112,12 +112,33 @@ export interface UrlScanResult {
   url: string;
   domain: string;
   resolved_ip: string | null;
+  // URLhaus
   urlhaus_status: "online" | "offline" | "unknown" | "not_found";
   urlhaus_threat: string | null;
   urlhaus_tags: string[];
   is_phishing: boolean;
   is_malware: boolean;
   is_shortened: boolean;
+  // Redirect chain
+  redirect_chain: string[];
+  final_url: string | null;
+  // Domain age (RDAP)
+  domain_age_days: number | null;
+  domain_created: string | null;
+  domain_registrar: string | null;
+  // URLScan.io
+  urlscan_found: boolean;
+  urlscan_categories: string[];
+  urlscan_verdicts: string[];
+  // Wayback Machine
+  wayback_available: boolean;
+  wayback_oldest_snapshot: string | null;
+  // SSL (crt.sh)
+  ssl_issuer: string | null;
+  ssl_valid_from: string | null;
+  ssl_valid_to: string | null;
+  ssl_days_remaining: number | null;
+  // AI
   risk: RiskLevel;
   summary: string;
   flags: string[];
@@ -139,6 +160,23 @@ export interface EmailLookupResult {
   spoofable: boolean;
   domain_reputation: string | null;
   profiles: string[];
+  // DNS intelligence
+  mx_records: string[];
+  has_mx: boolean;
+  spf_record: string | null;
+  dmarc_record: string | null;
+  spf_enforced: boolean;
+  dmarc_enforced: boolean;
+  // Domain age (RDAP)
+  domain_age_days: number | null;
+  domain_created: string | null;
+  domain_registrar: string | null;
+  // Activity signals
+  first_seen: string | null;
+  last_seen: string | null;
+  deliverable: boolean | null;
+  new_domain: boolean;
+  suspicious_tld: boolean;
   // AI
   risk: RiskLevel;
   summary: string;

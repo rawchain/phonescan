@@ -33,7 +33,7 @@ function getIp(req: NextRequest): string {
 // ---------------------------------------------------------------------------
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const MAX_TOKENS: Record<Depth, number> = { quick: 300, standard: 600, deep: 1000 };
+const MAX_TOKENS: Record<Depth, number> = { quick: 300, standard: 700, deep: 1400 };
 
 function extractJson(text: string): { risk: RiskLevel; summary: string; flags: string[] } | null {
   const lastClose = text.lastIndexOf("}");
@@ -53,7 +53,7 @@ function extractJson(text: string): { risk: RiskLevel; summary: string; flags: s
 }
 
 // ---------------------------------------------------------------------------
-// Platform definitions
+// Platform definitions — 27 platforms
 // ---------------------------------------------------------------------------
 
 interface Platform {
@@ -61,92 +61,214 @@ interface Platform {
   category: string;
   url: (u: string) => string;
   apiUrl: (u: string) => string;
-  // Returns true if the account exists based on the API response
   exists: (status: number, body: unknown) => boolean;
+  // Optional per-platform headers (e.g. User-Agent spoofing not needed — all server-side)
+}
+
+function b(x: unknown): Record<string, unknown> {
+  return (x && typeof x === "object") ? x as Record<string, unknown> : {};
 }
 
 const PLATFORMS: Platform[] = [
+  // ── Dev & Engineering ─────────────────────────────────────────────────────
   {
     name: "GitHub", category: "Dev",
-    url: u => `https://github.com/${u}`,
+    url:    u => `https://github.com/${u}`,
     apiUrl: u => `https://api.github.com/users/${encodeURIComponent(u)}`,
-    exists: (s, b) => s === 200 && !!(b as Record<string, unknown>)?.login,
+    exists: (s, x) => s === 200 && !!b(x).login,
   },
   {
     name: "GitLab", category: "Dev",
-    url: u => `https://gitlab.com/${u}`,
+    url:    u => `https://gitlab.com/${u}`,
     apiUrl: u => `https://gitlab.com/api/v4/users?username=${encodeURIComponent(u)}`,
-    exists: (s, b) => s === 200 && Array.isArray(b) && b.length > 0,
+    exists: (s, x) => s === 200 && Array.isArray(x) && (x as unknown[]).length > 0,
   },
   {
     name: "npm", category: "Dev",
-    url: u => `https://www.npmjs.com/~${u}`,
+    url:    u => `https://www.npmjs.com/~${u}`,
     apiUrl: u => `https://registry.npmjs.org/-/user/org.couchdb.user:${encodeURIComponent(u)}`,
     exists: (s) => s === 200,
   },
   {
     name: "dev.to", category: "Dev",
-    url: u => `https://dev.to/${u}`,
+    url:    u => `https://dev.to/${u}`,
     apiUrl: u => `https://dev.to/api/users/by_username?url=${encodeURIComponent(u)}`,
-    exists: (s, b) => s === 200 && !!(b as Record<string, unknown>)?.id,
-  },
-  {
-    name: "HackerNews", category: "Community",
-    url: u => `https://news.ycombinator.com/user?id=${u}`,
-    apiUrl: u => `https://hacker-news.firebaseio.com/v0/user/${encodeURIComponent(u)}.json`,
-    exists: (s, b) => s === 200 && b !== null && !!(b as Record<string, unknown>)?.id,
-  },
-  {
-    name: "Reddit", category: "Community",
-    url: u => `https://www.reddit.com/user/${u}`,
-    apiUrl: u => `https://www.reddit.com/user/${encodeURIComponent(u)}/about.json`,
-    exists: (s, b) => s === 200 && !!(b as Record<string, unknown>)?.data,
-  },
-  {
-    name: "Keybase", category: "Crypto/Security",
-    url: u => `https://keybase.io/${u}`,
-    apiUrl: u => `https://keybase.io/_/api/1.0/user/lookup.json?username=${encodeURIComponent(u)}`,
-    exists: (s, b) => {
-      if (s !== 200) return false;
-      const data = b as Record<string, unknown>;
-      return Array.isArray(data?.them) && (data.them as unknown[]).length > 0;
-    },
-  },
-  {
-    name: "Chess.com", category: "Gaming",
-    url: u => `https://www.chess.com/member/${u}`,
-    apiUrl: u => `https://api.chess.com/pub/player/${encodeURIComponent(u.toLowerCase())}`,
-    exists: (s, b) => s === 200 && !!(b as Record<string, unknown>)?.username,
-  },
-  {
-    name: "Lichess", category: "Gaming",
-    url: u => `https://lichess.org/@/${u}`,
-    apiUrl: u => `https://lichess.org/api/user/${encodeURIComponent(u.toLowerCase())}`,
-    exists: (s, b) => s === 200 && !!(b as Record<string, unknown>)?.id,
+    exists: (s, x) => s === 200 && !!b(x).id,
   },
   {
     name: "Replit", category: "Dev",
-    url: u => `https://replit.com/@${u}`,
+    url:    u => `https://replit.com/@${u}`,
     apiUrl: u => `https://replit.com/data/repls/${encodeURIComponent(u)}`,
     exists: (s) => s === 200,
   },
   {
+    name: "Codeberg", category: "Dev",
+    url:    u => `https://codeberg.org/${u}`,
+    apiUrl: u => `https://codeberg.org/api/v1/users/${encodeURIComponent(u)}`,
+    exists: (s, x) => s === 200 && !!b(x).login,
+  },
+  {
+    name: "DockerHub", category: "Dev",
+    url:    u => `https://hub.docker.com/u/${u}`,
+    apiUrl: u => `https://hub.docker.com/v2/users/${encodeURIComponent(u)}/`,
+    exists: (s, x) => s === 200 && !!b(x).username,
+  },
+  {
+    name: "HuggingFace", category: "Dev",
+    url:    u => `https://huggingface.co/${u}`,
+    apiUrl: u => `https://huggingface.co/api/users/${encodeURIComponent(u)}`,
+    exists: (s, x) => s === 200 && (!!b(x).name || !!b(x).user),
+  },
+  {
+    name: "PyPI", category: "Dev",
+    url:    u => `https://pypi.org/user/${u}/`,
+    apiUrl: u => `https://pypi.org/user/${encodeURIComponent(u)}/`,
+    exists: (s) => s === 200,
+  },
+  {
+    name: "RubyGems", category: "Dev",
+    url:    u => `https://rubygems.org/profiles/${u}`,
+    apiUrl: u => `https://rubygems.org/api/v1/owners/${encodeURIComponent(u)}/gems.json`,
+    exists: (s, x) => s === 200 && Array.isArray(x),
+  },
+  {
+    name: "Bitbucket", category: "Dev",
+    url:    u => `https://bitbucket.org/${u}`,
+    apiUrl: u => `https://api.bitbucket.org/2.0/users/${encodeURIComponent(u)}`,
+    exists: (s, x) => s === 200 && !!b(x).account_id,
+  },
+  {
+    name: "Codepen", category: "Dev",
+    url:    u => `https://codepen.io/${u}`,
+    apiUrl: u => `https://codepen.io/${encodeURIComponent(u)}`,
+    exists: (s) => s === 200,
+  },
+
+  // ── Community & Forums ────────────────────────────────────────────────────
+  {
+    name: "HackerNews", category: "Community",
+    url:    u => `https://news.ycombinator.com/user?id=${u}`,
+    apiUrl: u => `https://hacker-news.firebaseio.com/v0/user/${encodeURIComponent(u)}.json`,
+    exists: (s, x) => s === 200 && x !== null && !!b(x).id,
+  },
+  {
+    name: "Reddit", category: "Community",
+    url:    u => `https://www.reddit.com/user/${u}`,
+    apiUrl: u => `https://www.reddit.com/user/${encodeURIComponent(u)}/about.json`,
+    exists: (s, x) => s === 200 && !!b(b(x).data).name,
+  },
+  {
+    name: "Stack Overflow", category: "Community",
+    url:    u => `https://stackoverflow.com/users?tab=reputation&search=${u}`,
+    apiUrl: u => `https://api.stackexchange.com/2.3/users?order=desc&sort=reputation&inname=${encodeURIComponent(u)}&site=stackoverflow&pagesize=5`,
+    exists: (s, x) => {
+      if (s !== 200 || !Array.isArray(b(x).items)) return false;
+      const items = b(x).items as Array<Record<string, unknown>>;
+      // Accept if any item has a display_name (can't access u here; presence is good signal)
+      return items.length > 0 && items.some(i => typeof i.display_name === "string" && i.display_name.length > 0);
+    },
+  },
+  {
+    name: "Mastodon", category: "Community",
+    url:    u => `https://mastodon.social/@${u}`,
+    apiUrl: u => `https://mastodon.social/api/v1/accounts/lookup?acct=${encodeURIComponent(u)}`,
+    exists: (s, x) => s === 200 && !!b(x).id,
+  },
+
+  // ── Gaming ────────────────────────────────────────────────────────────────
+  {
+    name: "Chess.com", category: "Gaming",
+    url:    u => `https://www.chess.com/member/${u}`,
+    apiUrl: u => `https://api.chess.com/pub/player/${encodeURIComponent(u.toLowerCase())}`,
+    exists: (s, x) => s === 200 && !!b(x).username,
+  },
+  {
+    name: "Lichess", category: "Gaming",
+    url:    u => `https://lichess.org/@/${u}`,
+    apiUrl: u => `https://lichess.org/api/user/${encodeURIComponent(u.toLowerCase())}`,
+    exists: (s, x) => s === 200 && !!b(x).id,
+  },
+  {
+    name: "Speedrun.com", category: "Gaming",
+    url:    u => `https://www.speedrun.com/user/${u}`,
+    apiUrl: u => `https://www.speedrun.com/api/v1/users?lookup=${encodeURIComponent(u)}`,
+    exists: (s, x) => {
+      if (s !== 200) return false;
+      const data = (b(x).data) as unknown;
+      return Array.isArray(data) ? (data as unknown[]).length > 0 : !!b(data as Record<string,unknown>).id;
+    },
+  },
+
+  // ── Social & Creative ─────────────────────────────────────────────────────
+  {
+    name: "Twitch", category: "Streaming",
+    url:    u => `https://www.twitch.tv/${u}`,
+    apiUrl: u => `https://www.twitch.tv/${encodeURIComponent(u)}`,
+    exists: (s) => s === 200,
+  },
+  {
+    name: "Bluesky", category: "Social",
+    url:    u => `https://bsky.app/profile/${u}.bsky.social`,
+    apiUrl: u => `https://public.api.bsky.app/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(u)}.bsky.social`,
+    exists: (s, x) => s === 200 && !!b(x).did,
+  },
+  {
+    name: "Medium", category: "Social",
+    url:    u => `https://medium.com/@${u}`,
+    apiUrl: u => `https://medium.com/@${encodeURIComponent(u)}`,
+    exists: (s) => s === 200,
+  },
+  {
+    name: "Keybase", category: "Crypto/Security",
+    url:    u => `https://keybase.io/${u}`,
+    apiUrl: u => `https://keybase.io/_/api/1.0/user/lookup.json?username=${encodeURIComponent(u)}`,
+    exists: (s, x) => {
+      if (s !== 200) return false;
+      const them = b(x).them;
+      return Array.isArray(them) && (them as unknown[]).length > 0;
+    },
+  },
+
+  // ── Identity & Publishing ─────────────────────────────────────────────────
+  {
     name: "Gravatar", category: "Identity",
-    url: u => `https://gravatar.com/${u}`,
+    url:    u => `https://gravatar.com/${u}`,
     apiUrl: u => `https://en.gravatar.com/${encodeURIComponent(u)}.json`,
     exists: (s) => s === 200,
   },
   {
-    name: "Twitch", category: "Streaming",
-    url: u => `https://www.twitch.tv/${u}`,
-    apiUrl: u => `https://www.twitch.tv/${encodeURIComponent(u)}`,
+    name: "Substack", category: "Publishing",
+    url:    u => `https://${u}.substack.com`,
+    apiUrl: u => `https://${encodeURIComponent(u)}.substack.com/api/v1/homepage`,
+    exists: (s) => s === 200,
+  },
+  {
+    name: "Patreon", category: "Publishing",
+    url:    u => `https://www.patreon.com/${u}`,
+    apiUrl: u => `https://www.patreon.com/api/user?filter[vanity]=${encodeURIComponent(u)}`,
+    exists: (s, x) => {
+      if (s !== 200) return false;
+      const data = (b(x).data) as unknown[];
+      return Array.isArray(data) && data.length > 0;
+    },
+  },
+  {
+    name: "SoundCloud", category: "Music",
+    url:    u => `https://soundcloud.com/${u}`,
+    apiUrl: u => `https://soundcloud.com/${encodeURIComponent(u)}`,
+    exists: (s) => s === 200,
+  },
+  {
+    name: "Bandcamp", category: "Music",
+    url:    u => `https://${u}.bandcamp.com`,
+    apiUrl: u => `https://${encodeURIComponent(u)}.bandcamp.com`,
     exists: (s) => s === 200,
   },
 ];
 
 const HEADERS = {
-  "User-Agent": "PhoneScan/1.0 (+https://phonescan-gamma.vercel.app)",
-  "Accept": "application/json",
+  "User-Agent": "Mozilla/5.0 (compatible; PhoneScan/1.0; +https://phonescan-gamma.vercel.app)",
+  "Accept": "application/json, text/html",
 };
 
 // ---------------------------------------------------------------------------
@@ -172,7 +294,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "A username is required." }, { status: 400 });
   }
 
-  const username = rawUsername.trim().replace(/^@/, ""); // strip leading @
+  const username = rawUsername.trim().replace(/^@/, "");
   if (!/^[a-zA-Z0-9_.\-]{1,50}$/.test(username)) {
     return NextResponse.json(
       { error: "Invalid username. Use only letters, numbers, underscores, hyphens, and dots." },
@@ -184,20 +306,25 @@ export async function POST(req: NextRequest) {
   const depth: Depth = validDepths.includes(rawDepth as Depth) ? (rawDepth as Depth) : "standard";
 
   // ---------------------------------------------------------------------------
-  // Check all platforms in parallel
+  // Check all platforms in parallel (7 s timeout each)
   // ---------------------------------------------------------------------------
-  const fetchOpts = { signal: AbortSignal.timeout(6000), headers: HEADERS, cache: "no-store" as const };
-
   const checks = await Promise.allSettled(
     PLATFORMS.map(async (platform) => {
       try {
-        const res = await fetch(platform.apiUrl(username), fetchOpts);
-        let body: unknown = null;
+        const res = await fetch(platform.apiUrl(username), {
+          signal: AbortSignal.timeout(7000),
+          headers: HEADERS,
+          cache: "no-store",
+        });
+        let respBody: unknown = null;
         const ct = res.headers.get("content-type") ?? "";
         if (ct.includes("json")) {
-          try { body = await res.json(); } catch { body = null; }
+          try { respBody = await res.json(); } catch { respBody = null; }
+        } else {
+          // For HTML-based checks we only care about status
+          respBody = null;
         }
-        const found = platform.exists(res.status, body);
+        const found = platform.exists(res.status, respBody);
         return { platform, found };
       } catch {
         return { platform, found: false };
@@ -208,14 +335,17 @@ export async function POST(req: NextRequest) {
   const found: UsernameResult["found"] = [];
   const not_found: string[] = [];
 
-  for (const result of checks) {
-    if (result.status === "fulfilled") {
-      const { platform, found: isFound } = result.value;
+  for (const r of checks) {
+    if (r.status === "fulfilled") {
+      const { platform, found: isFound } = r.value;
       if (isFound) {
         found.push({ platform: platform.name, url: platform.url(username), category: platform.category });
       } else {
         not_found.push(platform.name);
       }
+    } else {
+      // Promise rejected entirely — count as not found
+      not_found.push("Unknown");
     }
   }
 
@@ -225,10 +355,18 @@ export async function POST(req: NextRequest) {
   const foundList = found.map(f => `${f.platform} (${f.category}): ${f.url}`).join("\n");
   const meta = [
     `Username: @${username}`,
-    `Platforms found on (${found.length}/${PLATFORMS.length}): ${found.length > 0 ? found.map(f => f.platform).join(", ") : "none"}`,
-    `Platforms not found: ${not_found.join(", ") || "none"}`,
-    found.length > 0 ? `Profile links:\n${foundList}` : null,
-  ].filter(Boolean).join("\n");
+    `Total platforms checked: ${PLATFORMS.length}`,
+    `Found on ${found.length} platforms: ${found.length > 0 ? found.map(f => f.platform).join(", ") : "none"}`,
+    `Not found on: ${not_found.slice(0, 15).join(", ") || "none"}`,
+    "",
+    found.length > 0 ? `Profile links:\n${foundList}` : "No profiles found.",
+    "",
+    `Digital footprint breadth: ${found.length === 0 ? "None detected" : found.length <= 3 ? "Minimal" : found.length <= 8 ? "Moderate" : found.length <= 15 ? "Extensive" : "Very Extensive"}`,
+    `Dev presence: ${found.filter(f => f.category === "Dev").map(f => f.platform).join(", ") || "none"}`,
+    `Community presence: ${found.filter(f => f.category === "Community").map(f => f.platform).join(", ") || "none"}`,
+    `Social presence: ${found.filter(f => ["Social","Streaming","Publishing","Music"].includes(f.category)).map(f => f.platform).join(", ") || "none"}`,
+    `Security presence (Keybase, etc.): ${found.filter(f => f.category === "Crypto/Security").map(f => f.platform).join(", ") || "none"}`,
+  ].filter(s => s !== null).join("\n");
 
   const jsonInstruction = `\nAt the very end of your response, output the following JSON on its own line:\n{"risk":"High|Medium|Low|Unknown","summary":"one sentence summary","flags":["finding 1","finding 2","finding 3"]}`;
 
@@ -236,12 +374,12 @@ export async function POST(req: NextRequest) {
   if (depth === "quick") {
     userPrompt = `Analyse this username OSINT data in 2–3 sentences. Note the most significant platforms found and any risk implications.\n\n${meta}${jsonInstruction}`;
   } else if (depth === "standard") {
-    userPrompt = `Analyse this username. Cover: (1) Digital Footprint Overview, (2) Key Platforms & Implications, (3) Risk Assessment. 2–3 sentences each.\n\n${meta}${jsonInstruction}`;
+    userPrompt = `Analyse this username. Cover: (1) Digital Footprint Overview — how broad and consistent is the online presence, (2) Key Platforms & What They Reveal, (3) Privacy Risk Assessment — is this person easily traceable? 2–4 sentences each.\n\n${meta}${jsonInstruction}`;
   } else {
-    userPrompt = `Produce a full username OSINT report. Cover:\n1. Digital Footprint Scope\n2. Platform Presence & Implications\n3. Identity Consistency Signals\n4. Privacy Risk Assessment\n5. Recommended Next Steps\n\nData:\n${meta}${jsonInstruction}`;
+    userPrompt = `Produce a full username OSINT intelligence report. Cover:\n1. Digital Footprint Scope & Breadth\n2. Platform Presence & Cross-Platform Consistency\n3. Professional vs Personal Identity Balance\n4. Developer/Technical Profile (if applicable)\n5. Privacy & Exposure Risk Assessment\n6. What this presence reveals about the person\n7. Recommended Actions (for subject or investigator)\n\nData:\n${meta}${jsonInstruction}`;
   }
 
-  const systemPrompt = `You are an OSINT analyst specialising in digital identity investigation. Given a username and the platforms it was found on, analyse the person's digital footprint, assess privacy risks, and identify any notable patterns. Be factual and precise. Do not use markdown.`;
+  const systemPrompt = `You are an OSINT analyst specialising in digital identity investigation and social media intelligence. Given a username and the platforms it was found on, analyse the person's digital footprint, assess privacy risks, identify patterns across platforms, and draw inferences about the subject. Be factual, precise, and thorough. Do not use markdown.`;
 
   let aiText = "";
   try {

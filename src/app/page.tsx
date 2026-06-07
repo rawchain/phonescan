@@ -1167,6 +1167,80 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
           ))}
         </div>
 
+        {/* DNS infrastructure */}
+        <div>
+          <SectionLabel>EMAIL INFRASTRUCTURE</SectionLabel>
+          <div className="space-y-2">
+            {/* MX, SPF, DMARC status pills */}
+            <div className="flex flex-wrap gap-2">
+              <EmailIndicator label="MX RECORDS"    active={result.has_mx}          colour="#00ff88" />
+              <EmailIndicator label="DELIVERABLE"   active={result.deliverable === true} colour="#00ff88" />
+              <EmailIndicator label="SPF ENFORCED"  active={result.spf_enforced}    colour="#00ff88" />
+              <EmailIndicator label="DMARC ENFORCED" active={result.dmarc_enforced} colour="#00ff88" />
+              <EmailIndicator label="SPOOFABLE"     active={result.spoofable}        colour="#ffb800" />
+            </div>
+            {/* MX records list */}
+            {result.mx_records.length > 0 && (
+              <div className="border border-[var(--border)] rounded-sm bg-[#070910] p-3">
+                <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-2">MX RECORDS</div>
+                <div className="flex flex-col gap-1">
+                  {result.mx_records.map(mx => (
+                    <span key={mx} className="font-mono text-[11px] text-[var(--accent)]">{mx}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* SPF / DMARC records */}
+            {(result.spf_record || result.dmarc_record) && (
+              <div className="border border-[var(--border)] rounded-sm bg-[#070910] p-3 space-y-2">
+                {result.spf_record && (
+                  <div>
+                    <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">SPF</div>
+                    <div className="font-mono text-[10px] text-[var(--text)] break-all leading-relaxed">{result.spf_record}</div>
+                  </div>
+                )}
+                {result.dmarc_record && (
+                  <div>
+                    <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">DMARC</div>
+                    <div className="font-mono text-[10px] text-[var(--text)] break-all leading-relaxed">{result.dmarc_record}</div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Domain age */}
+        {(result.domain_age_days !== null || result.domain_created || result.domain_registrar) && (
+          <div>
+            <SectionLabel>DOMAIN INTELLIGENCE</SectionLabel>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {result.domain_age_days !== null && (
+                <InfoCell label="DOMAIN AGE" value={`${result.domain_age_days} days (${Math.floor(result.domain_age_days / 365)}y)`} />
+              )}
+              {result.domain_created && (
+                <InfoCell label="REGISTERED" value={result.domain_created.slice(0, 10)} />
+              )}
+              {result.domain_registrar && (
+                <InfoCell label="REGISTRAR" value={result.domain_registrar} />
+              )}
+              {result.new_domain && (
+                <div className="col-span-full px-3 py-2 border border-[rgba(255,60,90,0.35)] bg-[rgba(255,60,90,0.07)] rounded-sm">
+                  <span className="font-mono text-[10px] tracking-[2px] text-[#ff3c5a]">⚠ NEW DOMAIN — elevated phishing risk</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Activity */}
+        {(result.first_seen || result.last_seen) && (
+          <div className="grid grid-cols-2 gap-2">
+            {result.first_seen && <InfoCell label="FIRST SEEN" value={result.first_seen} />}
+            {result.last_seen  && <InfoCell label="LAST SEEN"  value={result.last_seen}  />}
+          </div>
+        )}
+
         {/* Social profiles */}
         {result.profiles.length > 0 && (
           <div>
@@ -1422,38 +1496,166 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
           </div>
         </div>
 
-        {/* URLhaus status */}
-        <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3 flex flex-wrap items-center gap-4">
+        {/* Redirect chain */}
+        {result.redirect_chain.length > 0 && (
           <div>
-            <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">URLHAUS DATABASE</div>
-            <div className="font-mono text-[12px] tracking-[1px]" style={{ color: uhColour }}>{uhLabel}</div>
-          </div>
-          {result.urlhaus_threat && (
-            <div>
-              <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">THREAT TYPE</div>
-              <div className="font-mono text-[12px] text-[#ff3c5a]">{result.urlhaus_threat}</div>
-            </div>
-          )}
-          {result.urlhaus_tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {result.urlhaus_tags.map(tag => (
-                <span
-                  key={tag}
-                  className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
-                  style={{ borderColor: "rgba(255,60,90,0.35)", background: "rgba(255,60,90,0.08)", color: "#ff3c5a" }}
-                >
-                  {tag}
-                </span>
+            <SectionLabel>REDIRECT CHAIN ({result.redirect_chain.length} HOP{result.redirect_chain.length !== 1 ? "S" : ""})</SectionLabel>
+            <div className="border border-[rgba(255,184,0,0.25)] rounded-sm bg-[#070910] p-3 space-y-1.5">
+              <div className="flex items-start gap-2">
+                <span className="font-mono text-[9px] tracking-[2px] text-[var(--muted)] shrink-0 mt-0.5">START</span>
+                <span className="font-mono text-[10px] text-[var(--text)] break-all">{result.url}</span>
+              </div>
+              {result.redirect_chain.map((hop, i) => (
+                <div key={i} className="flex items-start gap-2">
+                  <span className="font-mono text-[9px] tracking-[2px] text-[#ffb800] shrink-0 mt-0.5">→ HOP {i + 1}</span>
+                  <span className="font-mono text-[10px] text-white break-all">{hop}</span>
+                </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Threat databases */}
+        <div>
+          <SectionLabel>THREAT DATABASE RESULTS</SectionLabel>
+          <div className="space-y-2">
+            {/* URLhaus */}
+            <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3 flex flex-wrap items-center gap-4">
+              <div>
+                <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">URLHAUS</div>
+                <div className="font-mono text-[12px] tracking-[1px]" style={{ color: uhColour }}>{uhLabel}</div>
+              </div>
+              {result.urlhaus_threat && (
+                <div>
+                  <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">THREAT TYPE</div>
+                  <div className="font-mono text-[12px] text-[#ff3c5a]">{result.urlhaus_threat}</div>
+                </div>
+              )}
+              {result.urlhaus_tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.urlhaus_tags.map(tag => (
+                    <span
+                      key={tag}
+                      className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                      style={{ borderColor: "rgba(255,60,90,0.35)", background: "rgba(255,60,90,0.08)", color: "#ff3c5a" }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* URLScan.io */}
+            <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3 flex flex-wrap items-center gap-4">
+              <div>
+                <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">URLSCAN.IO</div>
+                <div
+                  className="font-mono text-[12px]"
+                  style={{ color: result.urlscan_found ? (result.urlscan_categories.length > 0 ? "#ffb800" : "#00ff88") : "var(--muted)" }}
+                >
+                  {result.urlscan_found ? `FOUND IN DATABASE` : "Not in scan history"}
+                </div>
+              </div>
+              {result.urlscan_categories.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {result.urlscan_categories.map(c => (
+                    <span
+                      key={c}
+                      className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                      style={{ borderColor: "rgba(255,184,0,0.35)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                    >
+                      {c}
+                    </span>
+                  ))}
+                  {result.urlscan_verdicts.map(v => (
+                    <span
+                      key={v}
+                      className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                      style={{ borderColor: "rgba(100,150,255,0.35)", background: "rgba(100,150,255,0.08)", color: "#6496ff" }}
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Domain intel */}
+        <div>
+          <SectionLabel>DOMAIN INTELLIGENCE</SectionLabel>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <InfoCell label="DOMAIN"      value={result.domain} />
+            <InfoCell label="RESOLVED IP" value={result.resolved_ip ?? "—"} />
+            <InfoCell label="DEPTH"       value={result.depth.toUpperCase()} />
+            {result.domain_age_days !== null && (
+              <InfoCell label="DOMAIN AGE" value={`${result.domain_age_days}d (${Math.floor(result.domain_age_days / 365)}y)`} />
+            )}
+            {result.domain_created && (
+              <InfoCell label="REGISTERED" value={result.domain_created} />
+            )}
+            {result.domain_registrar && (
+              <InfoCell label="REGISTRAR" value={result.domain_registrar} />
+            )}
+          </div>
+          {/* New domain warning */}
+          {result.domain_age_days !== null && result.domain_age_days < 30 && (
+            <div className="mt-2 px-3 py-2 border border-[rgba(255,60,90,0.35)] bg-[rgba(255,60,90,0.07)] rounded-sm">
+              <span className="font-mono text-[10px] tracking-[2px] text-[#ff3c5a]">⚠ DOMAIN LESS THAN 30 DAYS OLD — high phishing risk</span>
             </div>
           )}
         </div>
 
-        {/* Meta cells */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          <InfoCell label="DOMAIN"      value={result.domain} />
-          <InfoCell label="RESOLVED IP" value={result.resolved_ip ?? "—"} />
-          <InfoCell label="DEPTH"       value={result.depth.toUpperCase()} />
+        {/* SSL certificate */}
+        {(result.ssl_issuer || result.ssl_valid_to) && (
+          <div>
+            <SectionLabel>SSL / TLS CERTIFICATE</SectionLabel>
+            <div className="border border-[var(--border)] rounded-sm bg-[#070910] px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {result.ssl_issuer && (
+                <div>
+                  <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">ISSUER</div>
+                  <div className="font-mono text-[10px] text-white truncate" title={result.ssl_issuer}>{result.ssl_issuer}</div>
+                </div>
+              )}
+              {result.ssl_valid_from && (
+                <div>
+                  <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">VALID FROM</div>
+                  <div className="font-mono text-[10px] text-white">{result.ssl_valid_from}</div>
+                </div>
+              )}
+              {result.ssl_valid_to && (
+                <div>
+                  <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">VALID TO</div>
+                  <div className="font-mono text-[10px] text-white">{result.ssl_valid_to}</div>
+                </div>
+              )}
+              {result.ssl_days_remaining !== null && (
+                <div>
+                  <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">EXPIRES IN</div>
+                  <div
+                    className="font-mono text-[12px] font-bold"
+                    style={{ color: result.ssl_days_remaining < 0 ? "#ff3c5a" : result.ssl_days_remaining < 14 ? "#ffb800" : "#00ff88" }}
+                  >
+                    {result.ssl_days_remaining < 0 ? "EXPIRED" : `${result.ssl_days_remaining}d`}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Web history */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <div
+            className="font-mono text-[10px] tracking-[1px] px-3 py-2 border rounded-sm flex items-center gap-2"
+            style={result.wayback_available
+              ? { borderColor: "rgba(0,255,136,0.3)", background: "rgba(0,255,136,0.05)", color: "#00ff88" }
+              : { borderColor: "var(--border)", color: "var(--muted)", opacity: 0.5 }}
+          >
+            <span>{result.wayback_available ? "●" : "○"}</span>
+            <span>WAYBACK MACHINE {result.wayback_available ? `· first seen ${result.wayback_oldest_snapshot}` : "· no archive"}</span>
+          </div>
         </div>
 
         <FlagsList flags={result.flags} />
