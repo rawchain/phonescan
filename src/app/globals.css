@@ -19,17 +19,15 @@
 
 * { box-sizing: border-box; }
 
-html {
-  background: #0a0c0f;
-}
+html { background: #0a0c0f; } /* opaque fallback — canvas overpaints at z-index 0 */
 
 body {
-  background: transparent;
+  background: #0a0c0f;
+  /* Subtle radial green glow at center */
+  background-image: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(0,51,0,0.15) 0%, transparent 70%);
   color: var(--text);
   font-family: 'Rajdhani', sans-serif;
   min-height: 100vh;
-  /* Subtle radial green glow at center */
-  background-image: radial-gradient(ellipse 80% 60% at 50% 30%, rgba(0,51,0,0.15) 0%, transparent 70%);
 }
 
 /* Scanline overlay — very subtle green tint */

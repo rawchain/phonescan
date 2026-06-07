@@ -145,9 +145,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3">
+    <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
       <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">{label}</div>
-      <div className="font-head font-semibold text-[15px] text-white break-words leading-tight">{value}</div>
+      <div className="font-head font-semibold text-[15px] text-white truncate leading-tight" title={value}>{value}</div>
     </div>
   );
 }
@@ -200,7 +200,21 @@ function AnalysisExpander({ text }: { text: string }) {
 
   const clean = text.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
   const paras = clean.split(/\n{2,}/).map(p => p.replace(/\n/g, " ").trim()).filter(Boolean);
-  const preview = paras[0] ?? clean.slice(0, 120);
+
+  // Strip markdown from a string (headings, bold, italic, inline code)
+  function stripMd(s: string): string {
+    return s
+      .replace(/^#{1,6}\s+/g, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .trim();
+  }
+
+  // Find first paragraph that isn't a heading line, clean it, take first sentence
+  const rawPreview = paras.find(p => !/^#{1,6}\s/.test(p)) ?? paras[0] ?? clean;
+  const cleanPreview = stripMd(rawPreview);
+  const preview = cleanPreview.match(/^[^.!?]+[.!?]/)?.[0]?.trim() ?? cleanPreview.slice(0, 120);
 
   return (
     <div className="border border-[var(--border)] rounded-sm overflow-hidden">
@@ -420,7 +434,7 @@ function ResultCard({ result }: { result: LookupResult }) {
     { label: "COUNTRY",   value: result.parsed.region ?? "—" },
     { label: "CODE",      value: result.parsed.country ?? "—" },
     { label: "LINE TYPE", value: lineType.toUpperCase() },
-    { label: "CARRIER",   value: carrier ?? "—" },
+    { label: "CARRIER",   value: carrier ?? "Unknown" },
     { label: "LOCATION",  value: result.number_location || result.parsed.region || "—" },
     { label: "E.164",     value: result.parsed.e164 ?? "—" },
     { label: "VALID",     value: (result.number_valid ?? result.parsed.valid) ? "YES ✓" : "NO ✗" },
@@ -545,9 +559,28 @@ function ResultCard({ result }: { result: LookupResult }) {
 
         {/* Meta grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {metaItems.map(({ label, value }) => (
-            <InfoCell key={label} label={label} value={value} />
-          ))}
+          {metaItems.map(({ label, value }) =>
+            label === "CARRIER" ? (
+              <div key="CARRIER" className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
+                <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">CARRIER</div>
+                <div className="font-head font-semibold text-[15px] text-white truncate leading-tight" title={value}>
+                  {value}
+                </div>
+                {(isVoip || isHighRiskVoip) && (
+                  <span
+                    className="font-mono text-[8px] tracking-[1px] px-1.5 py-0.5 border rounded-sm mt-1 inline-block"
+                    style={isHighRiskVoip
+                      ? { borderColor: "rgba(255,60,90,0.4)", background: "rgba(255,60,90,0.1)", color: "#ff3c5a" }
+                      : { borderColor: "rgba(255,184,0,0.4)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                  >
+                    {isHighRiskVoip ? "⚠ HIGH RISK VOIP" : "⚠️ VOIP"}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <InfoCell key={label} label={label} value={value} />
+            )
+          )}
         </div>
 
         <FlagsList flags={result.flags} />
@@ -702,10 +735,19 @@ function IndicatorPill({ label, active, colour }: { label: string; active: boole
   );
 }
 
+const SAFE_INFRA_KEYWORDS = ["cloudflare", "google", "amazon", "microsoft", "apple", "fastly", "akamai"];
+
+function isSafeInfraProvider(result: IpLookupResult): boolean {
+  const haystack = [result.isp, result.org, result.whois_org].filter(Boolean).join(" ").toLowerCase();
+  return SAFE_INFRA_KEYWORDS.some(k => haystack.includes(k));
+}
+
 function IpResultCard({ result }: { result: IpLookupResult }) {
   const rc = riskColour(result.risk);
   const flag = flagEmoji(result.countryCode);
   const locationStr = [result.city, result.region, result.country].filter(Boolean).join(", ") || "Unknown";
+  const safeInfra = isSafeInfraProvider(result);
+  const showVpn = result.is_vpn && !safeInfra;
 
   const getReport = useCallback(() =>
     [
@@ -739,7 +781,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
     { label: "ASN",           value: result.asn ?? "—" },
     { label: "WHOIS ORG",     value: result.whois_org ?? "—" },
     { label: "NETWORK",       value: result.whois_network_name ?? "—" },
-    { label: "TIMEZONE",      value: result.timezone ?? "—" },
+    { label: "TIMEZONE",      value: result.timezone ? result.timezone.split("/").pop()!.replace(/_/g, " ") : "—" },
     { label: "USAGE TYPE",    value: result.abuse_usage_type ?? "—" },
     { label: "ABUSE REPORTS", value: result.abuse_total_reports != null ? String(result.abuse_total_reports) : "—" },
     { label: "DEPTH",         value: result.depth.toUpperCase() },
@@ -802,7 +844,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
         <div>
           <SectionLabel>REPUTATION SIGNALS</SectionLabel>
           <div className="flex flex-wrap gap-2">
-            <IndicatorPill label="VPN"           active={result.is_vpn}           colour="#ffb800" />
+            <IndicatorPill label="VPN"           active={showVpn}                 colour="#ffb800" />
             <IndicatorPill label="PROXY"         active={result.is_proxy}         colour="#ffb800" />
             <IndicatorPill label="TOR"           active={result.is_tor}           colour="#ff3c5a" />
             <IndicatorPill label="HOSTING / DC"  active={result.is_hosting}       colour="#6496ff" />
@@ -1136,21 +1178,30 @@ export default function Home() {
       {/* Matrix rain canvas — fixed behind everything */}
       <canvas
         ref={canvasRef}
-        style={{ position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none" }}
+        style={{
+          position: "fixed",
+          top: 0, left: 0,
+          width: "100vw",
+          height: "100vh",
+          zIndex: 0,
+          pointerEvents: "none",
+          display: "block",
+        }}
       />
 
       {/* Credit bar */}
       <div
-        className="font-jb w-full text-center"
         style={{
+          fontFamily: "'JetBrains Mono', monospace",
           fontSize: "11px",
           fontWeight: 700,
           letterSpacing: "0.3em",
           color: "#00ff41",
-          background: "rgba(0,255,65,0.03)",
-          borderTop: "1px solid rgba(0,255,65,0.12)",
-          borderBottom: "1px solid rgba(0,255,65,0.06)",
+          background: "rgba(0,255,65,0.04)",
+          borderBottom: "1px solid rgba(0,255,65,0.2)",
           padding: "6px 0",
+          textAlign: "center",
+          width: "100%",
           position: "relative",
           zIndex: 1,
         }}
