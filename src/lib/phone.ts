@@ -82,7 +82,42 @@ export interface IpLookupResult {
   resolved_ip: string;      // the actual IP used for lookup
   // Reverse IP — domains hosted on this IP (hackertarget)
   hosted_domains: string[];
+  // Open ports (hackertarget nmap)
+  open_ports: Array<{ port: number; protocol: string; service: string; state: string }>;
   // AI
+  risk: RiskLevel;
+  summary: string;
+  flags: string[];
+  raw: string;
+  depth: Depth;
+}
+
+export interface UsernameResult {
+  username: string;
+  found: Array<{
+    platform: string;
+    url: string;
+    category: string;
+  }>;
+  not_found: string[];
+  checked: number;
+  risk: RiskLevel;
+  summary: string;
+  flags: string[];
+  raw: string;
+  depth: Depth;
+}
+
+export interface UrlScanResult {
+  url: string;
+  domain: string;
+  resolved_ip: string | null;
+  urlhaus_status: "online" | "offline" | "unknown" | "not_found";
+  urlhaus_threat: string | null;
+  urlhaus_tags: string[];
+  is_phishing: boolean;
+  is_malware: boolean;
+  is_shortened: boolean;
   risk: RiskLevel;
   summary: string;
   flags: string[];

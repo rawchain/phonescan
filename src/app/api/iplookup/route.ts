@@ -244,11 +244,12 @@ export async function POST(req: NextRequest) {
   // ---------------------------------------------------------------------------
   // Fire all 7 sources in parallel
   // ---------------------------------------------------------------------------
-  const hackertargetUrl = `https://api.hackertarget.com/reverseiplookup/?q=${encodeURIComponent(ip)}`;
+  const hackertargetUrl  = `https://api.hackertarget.com/reverseiplookup/?q=${encodeURIComponent(ip)}`;
+  const nmapUrl          = `https://api.hackertarget.com/nmap/?q=${encodeURIComponent(ip)}`;
 
   const [
     ipApiRes, ipapiIsRes, getipintelRes,
-    abuseRes, dnsRes, rdapRes, torRes, hackertargetRes,
+    abuseRes, dnsRes, rdapRes, torRes, hackertargetRes, nmapRes,
   ] = await Promise.allSettled([
     fetch(ipApiUrl, fetchOpts).then(r => r.json()),
     fetch(ipapiIsUrl, fetchOpts).then(r => r.json()),
@@ -260,6 +261,7 @@ export async function POST(req: NextRequest) {
     fetch(rdapUrl, fetchOpts).then(r => r.json()),
     getTorExitNodes(),
     fetch(hackertargetUrl, { cache: "no-store", signal: AbortSignal.timeout(6000) }).then(r => r.text()),
+    fetch(nmapUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) }).then(r => r.text()),
   ]);
 
   // ---------------------------------------------------------------------------
@@ -312,6 +314,25 @@ export async function POST(req: NextRequest) {
         .map(l => l.trim())
         .filter(l => l && l.includes(".") && !l.startsWith("#"))
         .slice(0, 20);
+    }
+  }
+
+  // HackerTarget nmap — open ports
+  interface PortInfo { port: number; protocol: string; service: string; state: string; }
+  let openPorts: PortInfo[] = [];
+  if (nmapRes.status === "fulfilled" && typeof nmapRes.value === "string") {
+    const nmapText = nmapRes.value as string;
+    if (!nmapText.includes("error") && !nmapText.includes("API count")) {
+      // Parse lines like: "22/tcp   open  ssh"
+      const portLines = nmapText.split("\n").filter(l => /^\d+\//.test(l.trim()));
+      openPorts = portLines.map(line => {
+        const parts = line.trim().split(/\s+/);
+        const [portProto] = parts;
+        const [port, proto] = portProto.split("/");
+        const state   = parts[1] ?? "unknown";
+        const service = parts[2] ?? "unknown";
+        return { port: parseInt(port, 10), protocol: proto, service, state };
+      }).filter(p => p.state === "open").slice(0, 20);
     }
   }
 
@@ -424,6 +445,7 @@ export async function POST(req: NextRequest) {
   const result: IpLookupResult = {
     ...merged,
     hosted_domains: hostedDomains,
+    open_ports:     openPorts,
     risk:    extracted?.risk    ?? "Unknown",
     summary: extracted?.summary ?? aiText.slice(0, 200).trim(),
     flags:   extracted?.flags   ?? [],

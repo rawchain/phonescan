@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
-import type { LookupResult, IpLookupResult, EmailLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
+import type { LookupResult, IpLookupResult, EmailLookupResult, UsernameResult, UrlScanResult, Mode, Depth, RiskLevel } from "@/lib/phone";
 import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 
 const IpMap    = dynamic(() => import("@/components/IpMap"),    { ssr: false });
@@ -28,16 +28,30 @@ const EXAMPLE_IPS = [
 ];
 
 const MODES: { id: TabId; label: string; placeholder: string }[] = [
-  { id: "consumer", label: "📞 SCAM CHECK",    placeholder: "+1 555 123 4567  or  +44 7700 900000" },
-  { id: "blue",     label: "📞 PHONE LOOKUP",  placeholder: "+1 800 555 0199  or  +49 30 12345678" },
-  { id: "red",      label: "🌐 IP LOOKUP",     placeholder: "IP address or domain (e.g. 8.8.8.8 or google.com)" },
-  { id: "email",    label: "✉️ EMAIL LOOKUP",  placeholder: "user@example.com" },
+  { id: "consumer", label: "📞 SCAM CHECK",   placeholder: "+1 555 123 4567  or  +44 7700 900000" },
+  { id: "blue",     label: "📞 PHONE",        placeholder: "+1 800 555 0199  or  +49 30 12345678" },
+  { id: "red",      label: "🌐 IP LOOKUP",    placeholder: "IP address or domain (e.g. 8.8.8.8)" },
+  { id: "email",    label: "✉️ EMAIL",        placeholder: "user@example.com" },
+  { id: "username", label: "🔍 USERNAME",     placeholder: "@username  (letters, numbers, _ - .)" },
+  { id: "urlscan",  label: "🔗 URL SCAN",     placeholder: "https://example.com/path?query=1" },
 ];
 
 const EXAMPLE_EMAILS = [
   { label: "test@gmail.com",       note: "Free provider" },
   { label: "info@apple.com",       note: "Corporate" },
   { label: "user@mailinator.com",  note: "Disposable" },
+];
+
+const EXAMPLE_USERNAMES = [
+  { label: "torvalds",    note: "Linus Torvalds" },
+  { label: "sama",        note: "Sam Altman" },
+  { label: "rawchain",    note: "PhoneScan creator" },
+];
+
+const EXAMPLE_URLS = [
+  { label: "https://google.com",          note: "Legitimate" },
+  { label: "https://bit.ly/3example",     note: "Shortened" },
+  { label: "http://malware.testing.gov",  note: "Safe test" },
 ];
 
 const DEPTHS: { id: Depth; label: string }[] = [
@@ -50,10 +64,10 @@ const DEPTHS: { id: Depth; label: string }[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Tab type extends Mode with email
-type TabId = Mode | "email";
+// Tab type extends Mode with additional lookup types
+type TabId = Mode | "email" | "username" | "urlscan";
 
-type AnyResult = LookupResult | IpLookupResult | EmailLookupResult;
+type AnyResult = LookupResult | IpLookupResult | EmailLookupResult | UsernameResult | UrlScanResult;
 type HistoryEntry = AnyResult & { queriedAt: string };
 
 interface ReportSummary {
@@ -1004,6 +1018,29 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
           </div>
         )}
 
+        {/* Open ports (nmap) */}
+        {result.open_ports && result.open_ports.length > 0 && (
+          <div>
+            <SectionLabel>OPEN PORTS ({result.open_ports.length})</SectionLabel>
+            <div className="border border-[var(--border)] rounded-sm bg-[#070910] overflow-hidden">
+              <div className="divide-y divide-[var(--border)]">
+                {result.open_ports.map(p => (
+                  <div key={p.port} className="flex items-center gap-4 px-4 py-2 flex-wrap">
+                    <span className="font-mono text-[13px] font-bold" style={{ color: "var(--accent)", minWidth: "4rem" }}>{p.port}/{p.protocol}</span>
+                    <span className="font-mono text-[11px] text-white">{p.service}</span>
+                    <span
+                      className="font-mono text-[9px] tracking-[2px] px-2 py-0.5 border rounded-sm ml-auto"
+                      style={{ borderColor: "rgba(0,255,65,0.3)", background: "rgba(0,255,65,0.06)", color: "var(--accent)" }}
+                    >
+                      {p.state.toUpperCase()}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Flags */}
         <FlagsList flags={result.flags} />
 
@@ -1160,6 +1197,277 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
 }
 
 // ---------------------------------------------------------------------------
+// Username result card
+// ---------------------------------------------------------------------------
+
+const CATEGORY_COLOURS: Record<string, string> = {
+  Dev:             "#6496ff",
+  Community:       "#00ff88",
+  "Crypto/Security": "#ffb800",
+  Gaming:          "#ff6b6b",
+  Identity:        "#c084fc",
+  Streaming:       "#ff8c00",
+};
+
+function UsernameResultCard({ result }: { result: UsernameResult }) {
+  const rc = riskColour(result.risk);
+
+  const getReport = useCallback(() =>
+    [
+      "PhoneScan Username Report",
+      `@${result.username} — ${result.risk} Risk`,
+      result.summary, "",
+      `Found on (${result.found.length}/${result.checked}): ${result.found.map(f => f.platform).join(", ") || "none"}`,
+      result.found.length > 0 ? "\nProfile links:" : null,
+      ...result.found.map(f => `  ${f.platform}: ${f.url}`),
+      "", "Findings:", ...result.flags.map(f => `• ${f}`),
+      "", "Analysis:", result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
+    ].filter(s => s !== null).join("\n"),
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const getShare = useCallback(() =>
+    `https://phonescan-gamma.vercel.app/?q=${encodeURIComponent(result.username)}&mode=username`,
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  // Group found platforms by category
+  const byCategory = result.found.reduce<Record<string, typeof result.found>>((acc, p) => {
+    (acc[p.category] ??= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
+              USERNAME OSINT COMPLETE
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">
+                {result.checked} platforms · groq
+              </span>
+            </div>
+            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
+              @{result.username}
+            </div>
+            <div className="font-mono text-[12px] text-[var(--muted)] mt-0.5">
+              Found on {result.found.length} of {result.checked} platforms
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <CopyBtn label="COPY"    getText={getReport} />
+            <CopyBtn label="🔗 LINK" getText={getShare}  />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        {/* Risk banner */}
+        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-3xl leading-none">{rc.icon}</span>
+          <div>
+            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+          </div>
+        </div>
+
+        {/* Platform presence grouped by category */}
+        {result.found.length > 0 && (
+          <div>
+            <SectionLabel>PLATFORMS FOUND ({result.found.length})</SectionLabel>
+            <div className="space-y-3">
+              {Object.entries(byCategory).map(([cat, platforms]) => (
+                <div key={cat}>
+                  <div
+                    className="font-mono text-[9px] tracking-[3px] mb-1.5"
+                    style={{ color: CATEGORY_COLOURS[cat] ?? "var(--muted)" }}
+                  >
+                    {cat.toUpperCase()}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {platforms.map(p => (
+                      <a
+                        key={p.platform}
+                        href={p.url}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="font-mono text-[10px] tracking-[1px] px-3 py-1.5 border rounded-sm transition-all hover:opacity-90"
+                        style={{
+                          borderColor: `${CATEGORY_COLOURS[cat] ?? "#6496ff"}44`,
+                          background:  `${CATEGORY_COLOURS[cat] ?? "#6496ff"}0d`,
+                          color:        CATEGORY_COLOURS[cat] ?? "#6496ff",
+                        }}
+                      >
+                        ↗ {p.platform}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Not found list */}
+        {result.not_found.length > 0 && (
+          <div>
+            <SectionLabel>NOT FOUND ({result.not_found.length})</SectionLabel>
+            <div className="flex flex-wrap gap-1.5">
+              {result.not_found.map(n => (
+                <span
+                  key={n}
+                  className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm opacity-40"
+                  style={{ borderColor: "var(--border)", color: "var(--muted)" }}
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <FlagsList flags={result.flags} />
+
+        <div>
+          <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
+          <AnalysisExpander text={result.raw} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// URL scan result card
+// ---------------------------------------------------------------------------
+
+function UrlScanResultCard({ result }: { result: UrlScanResult }) {
+  const rc = riskColour(result.risk);
+
+  const getReport = useCallback(() =>
+    [
+      "PhoneScan URL Report",
+      `${result.url} — ${result.risk} Risk`,
+      result.summary, "",
+      `Domain: ${result.domain}`,
+      result.resolved_ip ? `Resolved IP: ${result.resolved_ip}` : null,
+      `URLhaus status: ${result.urlhaus_status}`,
+      result.urlhaus_threat ? `Threat: ${result.urlhaus_threat}` : null,
+      result.urlhaus_tags.length > 0 ? `Tags: ${result.urlhaus_tags.join(", ")}` : null,
+      `Malware: ${result.is_malware ? "YES" : "No"} | Phishing: ${result.is_phishing ? "YES" : "No"} | Shortened: ${result.is_shortened ? "Yes" : "No"}`,
+      "", "Findings:", ...result.flags.map(f => `• ${f}`),
+      "", "Analysis:", result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
+    ].filter(s => s !== null).join("\n"),
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const getShare = useCallback(() =>
+    `https://phonescan-gamma.vercel.app/?q=${encodeURIComponent(result.url)}&mode=urlscan`,
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const uhColour =
+    result.urlhaus_status === "online"   ? "#ff3c5a" :
+    result.urlhaus_status === "offline"  ? "#ffb800" :
+    result.urlhaus_status === "not_found"? "#00ff88" : "var(--muted)";
+
+  const uhLabel =
+    result.urlhaus_status === "online"    ? "⚠ ONLINE THREAT"   :
+    result.urlhaus_status === "offline"   ? "OFFLINE (was threat)" :
+    result.urlhaus_status === "not_found" ? "CLEAN (not in DB)"  : "UNKNOWN";
+
+  return (
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
+              URL THREAT ANALYSIS COMPLETE
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">
+                urlhaus · dns · groq
+              </span>
+            </div>
+            <div className="font-mono text-[14px] tracking-[1px] break-all" style={{ color: "var(--accent)" }}>
+              {result.url}
+            </div>
+            <div className="font-mono text-[11px] text-[var(--muted)] mt-0.5">
+              {result.domain}{result.resolved_ip ? ` · ${result.resolved_ip}` : ""}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <CopyBtn label="COPY"    getText={getReport} />
+            <CopyBtn label="🔗 LINK" getText={getShare}  />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        {/* Risk banner */}
+        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-3xl leading-none">{rc.icon}</span>
+          <div>
+            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+          </div>
+        </div>
+
+        {/* Threat indicators */}
+        <div>
+          <SectionLabel>THREAT INDICATORS</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            <EmailIndicator label="MALWARE"        active={result.is_malware}  colour="#ff3c5a" />
+            <EmailIndicator label="PHISHING"       active={result.is_phishing} colour="#ff3c5a" />
+            <EmailIndicator label="SHORTENED URL"  active={result.is_shortened} colour="#ffb800" />
+          </div>
+        </div>
+
+        {/* URLhaus status */}
+        <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-3 flex flex-wrap items-center gap-4">
+          <div>
+            <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">URLHAUS DATABASE</div>
+            <div className="font-mono text-[12px] tracking-[1px]" style={{ color: uhColour }}>{uhLabel}</div>
+          </div>
+          {result.urlhaus_threat && (
+            <div>
+              <div className="font-mono text-[9px] tracking-[3px] text-[var(--muted)] mb-1">THREAT TYPE</div>
+              <div className="font-mono text-[12px] text-[#ff3c5a]">{result.urlhaus_threat}</div>
+            </div>
+          )}
+          {result.urlhaus_tags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {result.urlhaus_tags.map(tag => (
+                <span
+                  key={tag}
+                  className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                  style={{ borderColor: "rgba(255,60,90,0.35)", background: "rgba(255,60,90,0.08)", color: "#ff3c5a" }}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Meta cells */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <InfoCell label="DOMAIN"      value={result.domain} />
+          <InfoCell label="RESOLVED IP" value={result.resolved_ip ?? "—"} />
+          <InfoCell label="DEPTH"       value={result.depth.toUpperCase()} />
+        </div>
+
+        <FlagsList flags={result.flags} />
+
+        <div>
+          <SectionLabel>AI THREAT ANALYSIS</SectionLabel>
+          <AnalysisExpander text={result.raw} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // History
 // ---------------------------------------------------------------------------
 
@@ -1167,10 +1475,12 @@ function HistoryPanel({
   history,
   onRestore,
   onClear,
+  onExportCSV,
 }: {
   history: HistoryEntry[];
   onRestore: (entry: HistoryEntry) => void;
   onClear: () => void;
+  onExportCSV: () => void;
 }) {
   const [cleared, setCleared] = useState(false);
 
@@ -1184,33 +1494,47 @@ function HistoryPanel({
 
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
-      <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between">
+      <div className="px-5 py-3 border-b border-[var(--border)] flex items-center justify-between gap-2">
         <span className="font-mono text-[10px] tracking-[3px] text-[var(--muted)]">
           {"// RECENT LOOKUPS ("}{history.length}{")"}
         </span>
-        <button
-          onClick={handleClear}
-          className={`font-mono text-[9px] tracking-[2px] px-2.5 py-1 border rounded-sm transition-all ${
-            cleared
-              ? "border-[var(--accent)] text-[var(--accent)]"
-              : "border-[var(--border)] text-[var(--muted)] hover:border-[#ff3c5a] hover:text-[#ff3c5a]"
-          }`}
-        >
-          {cleared ? "✓ CLEARED" : "CLEAR"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onExportCSV}
+            className="font-mono text-[9px] tracking-[2px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+          >
+            ↓ CSV
+          </button>
+          <button
+            onClick={handleClear}
+            className={`font-mono text-[9px] tracking-[2px] px-2.5 py-1 border rounded-sm transition-all ${
+              cleared
+                ? "border-[var(--accent)] text-[var(--accent)]"
+                : "border-[var(--border)] text-[var(--muted)] hover:border-[#ff3c5a] hover:text-[#ff3c5a]"
+            }`}
+          >
+            {cleared ? "✓ CLEARED" : "CLEAR"}
+          </button>
+        </div>
       </div>
       <div className="divide-y divide-[var(--border)]">
         {history.map((entry, i) => {
           const rc = riskColour(entry.risk);
-          const isIp    = "ip" in entry && !("email" in entry) && !("parsed" in entry);
-          const isEmail = "email" in entry && !("ip" in entry) && !("parsed" in entry);
+          const isIp    = "ip"       in entry && !("username" in entry) && !("url" in entry) && !("parsed" in entry);
+          const isEmail = "email"    in entry && !("ip" in entry) && !("parsed" in entry) && !("username" in entry) && !("url" in entry);
+          const isUser  = "username" in entry;
+          const isUrl   = "url"      in entry && !("username" in entry) && !("email" in entry) && !("parsed" in entry);
           const displayVal = isIp
             ? (entry as IpLookupResult).ip
             : isEmail
               ? (entry as EmailLookupResult).email
-              : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
-          const modeLabel = isIp ? "IP" : isEmail ? "EMAIL" : (entry as LookupResult).mode.toUpperCase();
-          const icon = isIp ? "🌐" : isEmail ? "✉️" : "📞";
+              : isUser
+                ? `@${(entry as UsernameResult).username}`
+                : isUrl
+                  ? (entry as UrlScanResult).url
+                  : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
+          const modeLabel = isIp ? "IP" : isEmail ? "EMAIL" : isUser ? "USERNAME" : isUrl ? "URL" : (entry as LookupResult).mode.toUpperCase();
+          const icon = isIp ? "🌐" : isEmail ? "✉️" : isUser ? "🔍" : isUrl ? "🔗" : "📞";
           return (
             <button
               key={i}
@@ -1338,7 +1662,7 @@ export default function Home() {
     const m = params.get("mode") as TabId | null;
     if (!q) return;
     hasUrlRunRef.current = true;
-    const resolvedMode: TabId = (m && ["consumer","blue","red","email"].includes(m)) ? m : "consumer";
+    const resolvedMode: TabId = (m && ["consumer","blue","red","email","username","urlscan"].includes(m)) ? m : "consumer";
     setMode(resolvedMode);
     setNumber(q);
     // Brief delay so state settles before lookup fires
@@ -1361,15 +1685,25 @@ export default function Home() {
       setError("Please enter a valid email address (e.g. user@example.com).");
       return;
     }
+    if (mode === "username" && !/^@?[a-zA-Z0-9_.\-]{1,50}$/.test(target)) {
+      setError("Invalid username format. Use letters, numbers, underscores, hyphens, and dots.");
+      return;
+    }
 
     setLoading(true); setError(null); setResult(null);
     try {
-      const endpoint = mode === "red" ? "/api/iplookup" : mode === "email" ? "/api/email" : "/api/lookup";
-      const body = mode === "red"
-        ? { ip: target, depth }
-        : mode === "email"
-          ? { email: target, depth }
-          : { number: target, mode, depth };
+      const endpoint =
+        mode === "red"      ? "/api/iplookup"  :
+        mode === "email"    ? "/api/email"     :
+        mode === "username" ? "/api/username"  :
+        mode === "urlscan"  ? "/api/urlscan"   :
+        "/api/lookup";
+      const body =
+        mode === "red"      ? { ip: target, depth }                    :
+        mode === "email"    ? { email: target, depth }                  :
+        mode === "username" ? { username: target, depth }               :
+        mode === "urlscan"  ? { url: target, depth }                    :
+        { number: target, mode, depth };
 
       const res  = await fetch(endpoint, {
         method: "POST",
@@ -1441,8 +1775,10 @@ export default function Home() {
 
   // Restore a history entry directly — no re-fetch
   const handleRestore = useCallback((entry: HistoryEntry) => {
-    const isIp    = "ip"    in entry;
-    const isEmail = "email" in entry && !("ip" in entry) && !("parsed" in entry);
+    const isIp       = "ip"       in entry && !("username" in entry) && !("url" in entry) && !("parsed" in entry);
+    const isEmail    = "email"    in entry && !("ip" in entry) && !("parsed" in entry) && !("username" in entry) && !("url" in entry);
+    const isUsername = "username" in entry && !("ip" in entry) && !("parsed" in entry);
+    const isUrl      = "url"      in entry && !("ip" in entry) && !("parsed" in entry) && !("username" in entry) && !("email" in entry);
     setResult(entry);
     setResultKey(k => k + 1);
     setError(null);
@@ -1454,6 +1790,12 @@ export default function Home() {
       const emailEntry = entry as EmailLookupResult;
       setMode("email");
       setNumber(emailEntry.email);
+    } else if (isUsername) {
+      setMode("username");
+      setNumber((entry as UsernameResult).username);
+    } else if (isUrl) {
+      setMode("urlscan");
+      setNumber((entry as UrlScanResult).url);
     } else {
       const phoneEntry = entry as LookupResult;
       setMode(phoneEntry.mode);
@@ -1490,10 +1832,41 @@ export default function Home() {
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
       if (e.key === "Enter" && document.activeElement === inputRef.current) lookup();
+      // Ctrl+K / Cmd+K — focus input
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+        inputRef.current?.select();
+      }
+      // Escape — clear result and blur
+      if (e.key === "Escape") {
+        setResult(null); setError(null);
+        inputRef.current?.blur();
+      }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [lookup]);
+
+  const exportHistoryCSV = useCallback(() => {
+    if (!history.length) return;
+    const rows = [["Target","Type","Risk","Summary","Time"]];
+    for (const entry of history) {
+      const isIp    = "ip"    in entry && !("username" in entry) && !("url" in entry) && !("parsed" in entry);
+      const isEmail = "email" in entry && !("ip" in entry) && !("parsed" in entry) && !("username" in entry) && !("url" in entry);
+      const isUser  = "username" in entry;
+      const isUrl   = "url" in entry && !("username" in entry) && !("email" in entry);
+      const target  = isIp ? (entry as IpLookupResult).ip : isEmail ? (entry as EmailLookupResult).email : isUser ? (entry as UsernameResult).username : isUrl ? (entry as UrlScanResult).url : (entry as LookupResult).parsed.raw;
+      const type    = isIp ? "IP" : isEmail ? "Email" : isUser ? "Username" : isUrl ? "URL" : (entry as LookupResult).mode;
+      rows.push([target, type, entry.risk, `"${entry.summary.replace(/"/g, '""')}"`, entry.queriedAt]);
+    }
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `phonescan-history-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  }, [history]);
 
   return (
     <>
@@ -1556,16 +1929,14 @@ export default function Home() {
         )}
       </header>
 
-      {/* Tab bar */}
-      <div className="flex w-full max-w-[700px]">
+      {/* Tab bar — horizontal scroll on mobile */}
+      <div className="flex w-full max-w-[700px] overflow-x-auto">
         {MODES.map((m, i) => (
           <button
             key={m.id}
             onClick={() => { setMode(m.id); setResult(null); setError(null); }}
-            className={`flex-1 py-3 font-head font-bold text-[11px] sm:text-[13px] tracking-[1px] sm:tracking-[2px] border transition-all duration-150 ${
-              i === 0 ? "rounded-tl-sm" : ""
-            } ${
-              i === MODES.length - 1 ? "rounded-tr-sm border-l-0" : i > 0 ? "border-l-0" : ""
+            className={`shrink-0 py-3 px-3 font-head font-bold text-[11px] sm:text-[12px] tracking-[1px] sm:tracking-[2px] border transition-all duration-150 ${
+              i === 0 ? "rounded-tl-sm" : "border-l-0"
             } ${
               mode === m.id
                 ? "text-[var(--accent)] border-[var(--border)] bg-[var(--surface)]"
@@ -1582,7 +1953,7 @@ export default function Home() {
           target="_blank"
           rel="noreferrer"
           aria-label="GitHub"
-          className="flex items-center px-3 border border-l-0 border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-white transition-colors shrink-0"
+          className="flex items-center px-3 border border-l-0 border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-white transition-colors shrink-0 ml-auto rounded-tr-sm"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
@@ -1596,7 +1967,11 @@ export default function Home() {
         {/* Input section */}
         <div className="px-8 pt-7 pb-6 border-b border-[var(--border)]">
           <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
-            {mode === "red" ? "// ENTER IP ADDRESS OR DOMAIN" : mode === "email" ? "// ENTER EMAIL ADDRESS" : "// ENTER NUMBER (with country code)"}
+            {mode === "red"      ? "// ENTER IP ADDRESS OR DOMAIN"   :
+             mode === "email"    ? "// ENTER EMAIL ADDRESS"          :
+             mode === "username" ? "// ENTER USERNAME TO OSINT"      :
+             mode === "urlscan"  ? "// ENTER URL TO ANALYSE"         :
+                                   "// ENTER NUMBER (with country code)"}
           </span>
           {bulkMode ? (
             <div className="space-y-3">
@@ -1720,13 +2095,47 @@ export default function Home() {
           </div>
 
           {/* Example chips — phone */}
-          {mode !== "red" && mode !== "email" && (
+          {(mode === "consumer" || mode === "blue") && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
               {EXAMPLE_NUMBERS.map(ex => (
                 <button
                   key={ex.number}
                   onClick={() => { setNumber(ex.number); lookup(ex.number); }}
+                  title={ex.note}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Example chips — username */}
+          {mode === "username" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
+              {EXAMPLE_USERNAMES.map(ex => (
+                <button
+                  key={ex.label}
+                  onClick={() => { setNumber(ex.label); lookup(ex.label); }}
+                  title={ex.note}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Example chips — URL */}
+          {mode === "urlscan" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
+              {EXAMPLE_URLS.map(ex => (
+                <button
+                  key={ex.label}
+                  onClick={() => { setNumber(ex.label); lookup(ex.label); }}
                   title={ex.note}
                   className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
                 >
@@ -1802,7 +2211,11 @@ export default function Home() {
               className="font-mono text-[12px] tracking-[2px] text-[var(--muted)]"
               style={{ animation: "pulse-text 1.4s ease-in-out infinite" }}
             >
-              {mode === "red" ? "QUERYING IP INTELLIGENCE..." : mode === "email" ? "QUERYING EMAIL INTELLIGENCE..." : "QUERYING AI INTELLIGENCE..."}
+              {mode === "red"      ? "QUERYING IP INTELLIGENCE..."       :
+               mode === "email"    ? "QUERYING EMAIL INTELLIGENCE..."    :
+               mode === "username" ? "SCANNING USERNAME ACROSS PLATFORMS..." :
+               mode === "urlscan"  ? "ANALYSING URL THREAT INTEL..."     :
+                                     "QUERYING AI INTELLIGENCE..."}
             </div>
           </div>
         )}
@@ -1834,11 +2247,15 @@ export default function Home() {
               }}
             />
             <div className="p-6 border-t border-[var(--border)]">
-              {"ip" in result && !("email" in result) && !("parsed" in result)
-                ? <IpResultCard    result={result as IpLookupResult}    />
-                : "email" in result && !("ip" in result) && !("parsed" in result)
-                  ? <EmailResultCard result={result as EmailLookupResult} />
-                  : <ResultCard      result={result as LookupResult}      />
+              {"ip" in result && !("email" in result) && !("parsed" in result) && !("username" in result) && !("url" in result)
+                ? <IpResultCard       result={result as IpLookupResult}       />
+                : "email" in result && !("ip" in result) && !("parsed" in result) && !("username" in result) && !("url" in result)
+                  ? <EmailResultCard  result={result as EmailLookupResult}    />
+                  : "username" in result
+                    ? <UsernameResultCard result={result as UsernameResult}   />
+                    : "url" in result && !("parsed" in result)
+                      ? <UrlScanResultCard result={result as UrlScanResult}   />
+                      : <ResultCard       result={result as LookupResult}     />
               }
             </div>
           </div>
@@ -1848,7 +2265,7 @@ export default function Home() {
       {/* History */}
       {history.length > 0 && (
         <div className="w-full max-w-[700px] mt-6">
-          <HistoryPanel history={history} onRestore={handleRestore} onClear={handleClearHistory} />
+          <HistoryPanel history={history} onRestore={handleRestore} onClear={handleClearHistory} onExportCSV={exportHistoryCSV} />
         </div>
       )}
 
