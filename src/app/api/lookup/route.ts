@@ -147,20 +147,39 @@ export async function POST(req: NextRequest) {
   const systemPrompt = getSystemPrompt(mode);
   const userPrompt = buildUserPrompt(number, parsed, mode, depth);
 
-  // --- Call Groq ---
-  let aiText: string;
-  try {
-    const completion = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      temperature: 0.4,
-      max_tokens: MAX_TOKENS[depth],
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    });
+  // --- Call Groq + NumVerify in parallel ---
+  const numVerifyKey = process.env.NUMVERIFY_API_KEY;
+  const e164 = parsed.e164 ?? number.trim();
 
-    aiText = completion.choices[0]?.message?.content ?? "";
+  const numVerifyPromise = numVerifyKey && mode !== "red"
+    ? fetch(
+        `http://apilayer.net/api/validate?access_key=${numVerifyKey}&number=${encodeURIComponent(e164)}&format=1`,
+        { cache: "no-store", signal: AbortSignal.timeout(6000) }
+      )
+        .then(r => r.json())
+        .catch(() => null)
+    : Promise.resolve(null);
+
+  const groqPromise = groq.chat.completions.create({
+    model: "llama-3.3-70b-versatile",
+    temperature: 0.4,
+    max_tokens: MAX_TOKENS[depth],
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt },
+    ],
+  });
+
+  let aiText: string;
+  let numVerifyData: Record<string, unknown> | null = null;
+
+  try {
+    const [groqResult, numVerifyResult] = await Promise.all([groqPromise, numVerifyPromise]);
+    aiText = groqResult.choices[0]?.message?.content ?? "";
+    // NumVerify returns { valid: false, error: {...} } on bad key/number — only use if valid
+    if (numVerifyResult && numVerifyResult.valid !== false && !numVerifyResult.error) {
+      numVerifyData = numVerifyResult as Record<string, unknown>;
+    }
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to contact AI service.";
@@ -181,6 +200,11 @@ export async function POST(req: NextRequest) {
     parsed,
     mode,
     depth,
+    // NumVerify enrichment
+    carrier:            (numVerifyData?.carrier as string | null | undefined) ?? null,
+    line_type_verified: (numVerifyData?.line_type as string | null | undefined) ?? null,
+    number_valid:       numVerifyData?.valid != null ? Boolean(numVerifyData.valid) : null,
+    number_location:    (numVerifyData?.location as string | null | undefined) ?? null,
   };
 
   return NextResponse.json(result, {

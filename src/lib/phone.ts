@@ -29,6 +29,11 @@ export interface LookupResult {
   parsed: ParsedNumber;
   mode: Mode;
   depth: Depth;
+  // NumVerify enrichment (optional — only present when API key is configured)
+  carrier: string | null;
+  line_type_verified: string | null;
+  number_valid: boolean | null;
+  number_location: string | null;
 }
 
 export interface IpLookupResult {

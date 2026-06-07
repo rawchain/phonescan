@@ -3,6 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { LookupResult, IpLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
+import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 
 const IpMap = dynamic(() => import("@/components/IpMap"), { ssr: false });
 
@@ -43,6 +44,12 @@ const DEPTHS: { id: Depth; label: string }[] = [
 
 type AnyResult = LookupResult | IpLookupResult;
 type HistoryEntry = AnyResult & { queriedAt: string };
+
+interface ReportSummary {
+  count: number;
+  categories: Array<{ name: string; count: number }>;
+  latest: string | null;
+}
 
 // ---------------------------------------------------------------------------
 // localStorage helpers — safe in SSR / try-catch guarded
@@ -262,10 +269,140 @@ function FlagsList({ flags }: { flags: string[] }) {
 // Phone result card
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Community report form
+// ---------------------------------------------------------------------------
+
+function ReportForm({
+  number,
+  onSuccess,
+  onCancel,
+}: {
+  number: string;
+  onSuccess: (category: string, newTotal: number) => void;
+  onCancel: () => void;
+}) {
+  const [category, setCategory] = useState("");
+  const [comment,  setComment]  = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  async function submit() {
+    if (!category) { setError("Please select a category."); return; }
+    setLoading(true); setError(null);
+    try {
+      const res = await fetch("/api/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ number, category, comment }),
+      });
+      const data = await res.json() as { error?: string; total_reports?: number };
+      if (!res.ok) { setError(data.error ?? "Failed to submit."); return; }
+      onSuccess(category, data.total_reports ?? 0);
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="border border-[rgba(255,184,0,0.25)] bg-[rgba(255,184,0,0.04)] rounded-sm px-4 py-4 space-y-3">
+      <div className="font-mono text-[10px] tracking-[3px] text-[#ffb800]">{"// REPORT THIS NUMBER"}</div>
+
+      {/* Category */}
+      <div>
+        <select
+          value={category}
+          onChange={e => setCategory(e.target.value)}
+          className="w-full bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[12px] text-white px-3 py-2 outline-none"
+          style={{ appearance: "none" }}
+        >
+          <option value="">Select category…</option>
+          {REPORT_CATEGORIES.map(c => (
+            <option key={c} value={c}>{c}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Comment */}
+      <textarea
+        value={comment}
+        onChange={e => setComment(e.target.value.slice(0, 200))}
+        placeholder="Optional comment (max 200 chars)…"
+        rows={2}
+        className="w-full bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[12px] text-white px-3 py-2 outline-none resize-none placeholder:text-[var(--muted)]"
+      />
+      <div className="font-mono text-[9px] text-[var(--muted)] text-right">{comment.length}/200</div>
+
+      {error && (
+        <div className="font-mono text-[11px] text-[#ff3c5a]">⚠ {error}</div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={loading || !category}
+          className="font-head font-bold text-[12px] tracking-[2px] px-4 py-2 rounded-sm text-black disabled:opacity-40 transition-all"
+          style={{ background: "var(--accent)" }}
+        >
+          {loading ? "SUBMITTING…" : "SUBMIT REPORT"}
+        </button>
+        <button
+          onClick={onCancel}
+          className="font-mono text-[11px] tracking-[2px] px-4 py-2 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:text-white transition-all"
+        >
+          CANCEL
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const HIGH_RISK_VOIP_CARRIERS = ["Google", "Twilio", "Bandwidth", "Vonage", "Telnyx", "Skype", "TextNow"];
+
 function ResultCard({ result }: { result: LookupResult }) {
   const displayNum    = result.parsed.internationalFormat ?? result.parsed.raw;
   const cleanAnalysis = result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
   const rc = riskColour(result.risk);
+
+  const lineType  = result.line_type_verified ?? result.parsed.type;
+  const isVoip    = lineType === "voip";
+  const carrier   = result.carrier ?? null;
+  const isHighRiskVoip = isVoip && carrier
+    ? HIGH_RISK_VOIP_CARRIERS.some(v => carrier.toLowerCase().includes(v.toLowerCase()))
+    : false;
+  const isInvalid = result.number_valid === false;
+
+  // Community reports state
+  const [community,    setCommunity]   = useState<ReportSummary | null>(null);
+  const [showForm,     setShowForm]    = useState(false);
+  const [submitMsg,    setSubmitMsg]   = useState<string | null>(null);
+
+  const lookupNumber = result.parsed.e164 ?? result.parsed.raw;
+
+  useEffect(() => {
+    if (!lookupNumber) return;
+    fetch(`/api/report?number=${encodeURIComponent(lookupNumber)}`)
+      .then(r => r.json())
+      .then((d: ReportSummary) => setCommunity(d))
+      .catch(() => {});
+  }, [lookupNumber]);
+
+  function handleReportSuccess(category: string, newTotal: number) {
+    setShowForm(false);
+    setSubmitMsg(`✓ Reported as ${category} — thank you`);
+    // Update community count optimistically
+    setCommunity(prev => {
+      if (!prev) return { count: newTotal, categories: [{ name: category, count: 1 }], latest: new Date().toISOString() };
+      const existing = prev.categories.find(c => c.name === category);
+      const updated = existing
+        ? prev.categories.map(c => c.name === category ? { ...c, count: c.count + 1 } : c)
+        : [...prev.categories, { name: category, count: 1 }];
+      return { count: newTotal, categories: updated.sort((a, b) => b.count - a.count), latest: new Date().toISOString() };
+    });
+    setTimeout(() => setSubmitMsg(null), 3000);
+  }
 
   const getReport = useCallback(() =>
     ["PhoneScan Report", `${displayNum} — ${result.risk} Risk`, result.summary, "",
@@ -281,23 +418,62 @@ function ResultCard({ result }: { result: LookupResult }) {
     { label: "NUMBER",    value: displayNum },
     { label: "COUNTRY",   value: result.parsed.region ?? "—" },
     { label: "CODE",      value: result.parsed.country ?? "—" },
-    { label: "LINE TYPE", value: result.parsed.type.toUpperCase() },
+    { label: "LINE TYPE", value: lineType.toUpperCase() },
+    { label: "CARRIER",   value: carrier ?? "—" },
+    { label: "LOCATION",  value: result.number_location ?? "—" },
     { label: "E.164",     value: result.parsed.e164 ?? "—" },
-    { label: "VALID",     value: result.parsed.valid ? "YES ✓" : "NO ✗" },
+    { label: "VALID",     value: (result.number_valid ?? result.parsed.valid) ? "YES ✓" : "NO ✗" },
     { label: "DEPTH",     value: result.depth.toUpperCase() },
     { label: "MODE",      value: result.mode.toUpperCase() },
   ];
 
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      {/* Header */}
       <div className="px-6 py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
               ANALYSIS COMPLETE
-              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">libphonenumber + groq</span>
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">libphonenumber · numverify · groq</span>
+              {/* Community report badge */}
+              {community !== null && community.count > 0 && (
+                <span
+                  className="ml-2 px-1.5 py-0.5 border rounded-sm text-[9px] tracking-[1px]"
+                  style={{ borderColor: "rgba(255,184,0,0.4)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                >
+                  🚩 {community.count} community {community.count === 1 ? "report" : "reports"}
+                </span>
+              )}
             </div>
             <div className="font-mono text-xl text-white tracking-[2px] break-all">{displayNum}</div>
+            {/* Carrier + VOIP badge */}
+            {carrier && (
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <span
+                  className="font-mono text-[12px]"
+                  style={{ color: isHighRiskVoip ? "#ff3c5a" : isVoip ? "#ffb800" : "var(--muted)" }}
+                >
+                  {carrier}
+                </span>
+                {isHighRiskVoip && (
+                  <span
+                    className="font-mono text-[9px] tracking-[2px] px-2 py-0.5 border rounded-sm"
+                    style={{ borderColor: "rgba(255,60,90,0.4)", background: "rgba(255,60,90,0.1)", color: "#ff3c5a" }}
+                  >
+                    ⚠ HIGH RISK VOIP
+                  </span>
+                )}
+                {isVoip && !isHighRiskVoip && (
+                  <span
+                    className="font-mono text-[9px] tracking-[2px] px-2 py-0.5 border rounded-sm"
+                    style={{ borderColor: "rgba(255,184,0,0.4)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                  >
+                    ⚠️ VOIP
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <CopyBtn label="COPY"  getText={getReport} />
@@ -307,6 +483,20 @@ function ResultCard({ result }: { result: LookupResult }) {
       </div>
 
       <div className="px-6 py-5 space-y-5">
+        {/* Invalid number banner */}
+        {isInvalid && (
+          <div className="flex items-center gap-3 px-4 py-3 border border-[rgba(255,60,90,0.4)] bg-[rgba(255,60,90,0.08)] rounded-sm">
+            <span className="text-xl leading-none">⚠️</span>
+            <div>
+              <div className="font-head font-bold tracking-[2px] text-[#ff3c5a] text-[15px]">INVALID NUMBER</div>
+              <div className="font-head text-[13px] text-[var(--muted)] mt-0.5">
+                NumVerify could not validate this number. It may be fictitious, unallocated, or incorrectly formatted.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Risk banner */}
         <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
           <span className="text-3xl leading-none">{rc.icon}</span>
           <div>
@@ -315,6 +505,44 @@ function ResultCard({ result }: { result: LookupResult }) {
           </div>
         </div>
 
+        {/* Community flagged banner */}
+        {community !== null && community.count >= 3 && (
+          <div className="flex items-start gap-3 px-4 py-3 border border-[rgba(255,60,90,0.4)] bg-[rgba(255,60,90,0.07)] rounded-sm">
+            <span className="text-xl leading-none shrink-0">⚠️</span>
+            <div className="min-w-0">
+              <div className="font-head font-bold tracking-[2px] text-[#ff3c5a] text-[14px]">COMMUNITY FLAGGED</div>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {community.categories.map(c => (
+                  <span
+                    key={c.name}
+                    className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                    style={{ borderColor: "rgba(255,60,90,0.3)", background: "rgba(255,60,90,0.06)", color: "#ff3c5a" }}
+                  >
+                    {c.name} ×{c.count}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Community category pills (when flagged < 3) */}
+        {community !== null && community.count > 0 && community.count < 3 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-[10px] text-[var(--muted)]">COMMUNITY:</span>
+            {community.categories.map(c => (
+              <span
+                key={c.name}
+                className="font-mono text-[9px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                style={{ borderColor: "rgba(255,184,0,0.3)", background: "rgba(255,184,0,0.06)", color: "#ffb800" }}
+              >
+                {c.name} ×{c.count}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Meta grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {metaItems.map(({ label, value }) => (
             <InfoCell key={label} label={label} value={value} />
@@ -327,6 +555,24 @@ function ResultCard({ result }: { result: LookupResult }) {
           <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
           <AnalysisExpander text={result.raw} />
         </div>
+
+        {/* Report this number */}
+        {submitMsg ? (
+          <div className="font-mono text-[12px] text-[#00ff88] opacity-80">{submitMsg}</div>
+        ) : showForm ? (
+          <ReportForm
+            number={lookupNumber}
+            onSuccess={handleReportSuccess}
+            onCancel={() => setShowForm(false)}
+          />
+        ) : (
+          <button
+            onClick={() => setShowForm(true)}
+            className="font-mono text-[11px] tracking-[2px] text-[var(--muted)] hover:text-[#ffb800] transition-colors"
+          >
+            🚩 Report this number
+          </button>
+        )}
       </div>
     </div>
   );
