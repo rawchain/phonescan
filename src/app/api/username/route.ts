@@ -267,7 +267,7 @@ const PLATFORMS: Platform[] = [
 ];
 
 const HEADERS = {
-  "User-Agent": "Mozilla/5.0 (compatible; PhoneScan/1.0; +https://phonescan-gamma.vercel.app)",
+  "User-Agent": "Mozilla/5.0 (compatible; REVL/1.0; +https://revl.vercel.app)",
   "Accept": "application/json, text/html",
 };
 

@@ -94,7 +94,7 @@ async function followRedirects(url: string): Promise<{ chain: string[]; final: s
         method: "HEAD",
         redirect: "manual",
         signal: AbortSignal.timeout(4000),
-        headers: { "User-Agent": "Mozilla/5.0 (compatible; PhoneScan/1.0)" },
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; REVL/1.0)" },
       });
       if (res.status >= 300 && res.status < 400) {
         const location = res.headers.get("location");
@@ -343,7 +343,7 @@ export async function POST(req: NextRequest) {
     // 1. URLhaus malware database
     fetch("https://urlhaus-api.abuse.ch/v1/url/", {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "PhoneScan/1.0" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "REVL/1.0" },
       body: `url=${encodeURIComponent(urlStr)}`,
       signal: AbortSignal.timeout(6000),
       cache: "no-store",

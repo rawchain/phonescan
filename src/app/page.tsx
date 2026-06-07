@@ -45,7 +45,7 @@ const EXAMPLE_EMAILS = [
 const EXAMPLE_USERNAMES = [
   { label: "torvalds",    note: "Linus Torvalds" },
   { label: "sama",        note: "Sam Altman" },
-  { label: "rawchain",    note: "PhoneScan creator" },
+  { label: "rawchain",    note: "REVL creator" },
 ];
 
 const EXAMPLE_URLS = [
@@ -80,7 +80,7 @@ interface ReportSummary {
 // localStorage helpers — safe in SSR / try-catch guarded
 // ---------------------------------------------------------------------------
 
-const HISTORY_KEY = "phonescan_history";
+const HISTORY_KEY = "revl_history";
 
 function loadHistory(): HistoryEntry[] {
   if (typeof window === "undefined") return [];
@@ -496,13 +496,13 @@ function ResultCard({ result }: { result: LookupResult }) {
   }
 
   const getReport = useCallback(() =>
-    ["PhoneScan Report", `${displayNum} — ${result.risk} Risk`, result.summary, "",
+    ["REVL Report", `${displayNum} — ${result.risk} Risk`, result.summary, "",
      "Findings:", ...result.flags.map(f => `• ${f}`), "", "Analysis:", cleanAnalysis].join("\n"),
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const getShare = useCallback(() => {
     const q = encodeURIComponent(result.parsed.e164 ?? result.parsed.raw);
-    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=${result.mode}`;
+    return `https://revl.vercel.app/?q=${q}&mode=${result.mode}`;
   },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -852,7 +852,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
 
   const getReport = useCallback(() =>
     [
-      "PhoneScan IP Report",
+      "REVL IP Report",
       `${result.ip} — ${result.risk} Risk`,
       result.summary, "",
       `Location: ${locationStr}`,
@@ -870,7 +870,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
   );
   const getShare = useCallback(() => {
     const q = encodeURIComponent(result.original_input ?? result.ip);
-    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=red`;
+    return `https://revl.vercel.app/?q=${q}&mode=red`;
   },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -1078,7 +1078,7 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
 
   const getReport = useCallback(() =>
     [
-      "PhoneScan Email Report",
+      "REVL Email Report",
       `${result.email} — ${result.risk} Risk`,
       result.summary, "",
       `Domain: ${result.domain}`,
@@ -1096,7 +1096,7 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
   );
   const getShare = useCallback(() => {
     const q = encodeURIComponent(result.email);
-    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=email`;
+    return `https://revl.vercel.app/?q=${q}&mode=email`;
   },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
@@ -1288,7 +1288,7 @@ function UsernameResultCard({ result }: { result: UsernameResult }) {
 
   const getReport = useCallback(() =>
     [
-      "PhoneScan Username Report",
+      "REVL Username Report",
       `@${result.username} — ${result.risk} Risk`,
       result.summary, "",
       `Found on (${result.found.length}/${result.checked}): ${result.found.map(f => f.platform).join(", ") || "none"}`,
@@ -1300,7 +1300,7 @@ function UsernameResultCard({ result }: { result: UsernameResult }) {
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const getShare = useCallback(() =>
-    `https://phonescan-gamma.vercel.app/?q=${encodeURIComponent(result.username)}&mode=username`,
+    `https://revl.vercel.app/?q=${encodeURIComponent(result.username)}&mode=username`,
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -1421,7 +1421,7 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
 
   const getReport = useCallback(() =>
     [
-      "PhoneScan URL Report",
+      "REVL URL Report",
       `${result.url} — ${result.risk} Risk`,
       result.summary, "",
       `Domain: ${result.domain}`,
@@ -1436,7 +1436,7 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
   const getShare = useCallback(() =>
-    `https://phonescan-gamma.vercel.app/?q=${encodeURIComponent(result.url)}&mode=urlscan`,
+    `https://revl.vercel.app/?q=${encodeURIComponent(result.url)}&mode=urlscan`,
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -2071,7 +2071,7 @@ export default function Home() {
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `phonescan-history-${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `revl-history-${new Date().toISOString().slice(0,10)}.csv`;
     a.click();
   }, [history]);
 
@@ -2118,16 +2118,16 @@ export default function Home() {
       {/* Header */}
       <header className="text-center mb-4 sm:mb-8 w-full max-w-[700px]">
         <div className="font-mono text-[10px] tracking-[4px] sm:tracking-[6px] text-[var(--accent)] opacity-70 mb-1.5">
-          {"// PHONESCAN //"}
+          {"// REVL //"}
         </div>
         <h1
           className="font-head font-bold text-white tracking-[2px] leading-none"
           style={{ fontSize: "clamp(1.8rem,6vw,3.2rem)" }}
         >
-          PHONE <span style={{ color: "var(--accent)", textShadow: "0 0 30px rgba(0,255,136,0.5)" }}>SCAN</span>
+          REV<span style={{ color: "var(--accent)", textShadow: "0 0 30px rgba(0,255,136,0.5)" }}>L</span>
         </h1>
         <div className="font-mono text-[9px] sm:text-[11px] tracking-[2px] sm:tracking-[3px] text-[var(--muted)] mt-1.5">
-          AI-POWERED OSINT · PHONE · IP · EMAIL · USERNAME · URL
+          OPEN SOURCE INTELLIGENCE · POWERED BY GROQ
         </div>
         {remaining !== null && (
           <div className="font-mono text-[9px] tracking-[2px] text-[var(--muted)] mt-1 opacity-60">
@@ -2393,7 +2393,7 @@ export default function Home() {
           )}
 
           <div className="font-mono text-[9px] sm:text-[10px] text-[var(--muted)] mt-2.5 opacity-60 leading-relaxed">
-            Groq · llama-3.3-70b ·{" "}
+            REVL · Groq · llama-3.3-70b ·{" "}
             <a href="https://github.com/rawchain" target="_blank" rel="noreferrer"
                className="text-[var(--accent)] opacity-70 hover:opacity-100 transition-opacity">
               github.com/rawchain
@@ -2481,7 +2481,7 @@ export default function Home() {
         className="mt-6 font-mono text-[9px] sm:text-[11px] tracking-[1px] text-[var(--muted)] text-center opacity-50"
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        Not responsible for misuse · {new Date().getFullYear()}
+        REVL · {new Date().getFullYear()} · We are not responsible for how you use this
       </footer>
       </div>
     </>

@@ -34,7 +34,7 @@ export default function PhoneMap({ location }: PhoneMapProps) {
     fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
       {
-        headers: { "User-Agent": "PhoneScan/1.0" },
+        headers: { "User-Agent": "REVL/1.0" },
         signal: controller.signal,
       }
     )

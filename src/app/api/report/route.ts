@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
   const commentStr = typeof comment === "string" ? comment.trim().slice(0, 200) : "";
 
   // Hash the IP — never store raw IPs
-  const ip_hash = createHash("sha256").update(ip + "phonescan_salt").digest("hex");
+  const ip_hash = createHash("sha256").update(ip + "revl_salt").digest("hex");
 
   const bin = await readBin();
   bin.reports.push({

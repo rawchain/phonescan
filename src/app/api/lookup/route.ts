@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
     ? fetch(`https://calltracer.io/api/lookup/${digits}`, {
         cache: "no-store",
         signal: AbortSignal.timeout(6000),
-        headers: { "User-Agent": "PhoneScan/1.0" },
+        headers: { "User-Agent": "REVL/1.0" },
       }).then(r => r.ok ? r.json() : null).catch(() => null)
     : Promise.resolve(null);
 
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
     ? fetch(`https://spam.skipcalls.com/check/${encodeURIComponent(e164)}`, {
         cache: "no-store",
         signal: AbortSignal.timeout(6000),
-        headers: { "User-Agent": "PhoneScan/1.0" },
+        headers: { "User-Agent": "REVL/1.0" },
       }).then(r => r.ok ? r.json() : null).catch(() => null)
     : Promise.resolve(null);
 

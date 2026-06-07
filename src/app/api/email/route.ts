@@ -226,7 +226,7 @@ export async function POST(req: NextRequest) {
   const [emailrepSettled, mxSettled, spfSettled, dmarcSettled, rdapSettled] = await Promise.allSettled([
     // 1. emailrep.io — reputation, breach, disposable, profiles
     fetch(`https://emailrep.io/query/${encodeURIComponent(email)}`, {
-      headers: { "User-Agent": "PhoneScan/1.0" },
+      headers: { "User-Agent": "REVL/1.0" },
       signal: AbortSignal.timeout(7000),
       cache: "no-store",
     }).then(r => r.ok ? r.json() as Promise<EmailRepResponse> : null).catch(() => null),
@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
 
   // Domain age — prefer emailrep's days_since_domain_creation, fall back to RDAP
   let domainAgeDays: number | null = details.days_since_domain_creation ?? null;
-  let domainCreated: string | null = rdap.created;
+  const domainCreated: string | null = rdap.created;
   if (domainAgeDays === null && rdap.created) {
     const created = new Date(rdap.created);
     if (!isNaN(created.getTime())) {

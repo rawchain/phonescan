@@ -2,13 +2,13 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "PhoneScan — Free Phone Intelligence",
-  description: "Identify scams, fraud, and unknown callers with AI-powered phone, email & IP analysis.",
+  title: "REVL — Open Source Intelligence",
+  description: "Free OSINT suite — phone, IP, email, username and URL intelligence powered by AI",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "PhoneScan",
+    title: "REVL",
   },
 };
 
