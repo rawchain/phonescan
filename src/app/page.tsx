@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
-import type { LookupResult, IpLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
+import type { LookupResult, IpLookupResult, EmailLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
 import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 
 const IpMap    = dynamic(() => import("@/components/IpMap"),    { ssr: false });
@@ -27,10 +27,17 @@ const EXAMPLE_IPS = [
   { label: "github.com", note: "GitHub"           },
 ];
 
-const MODES: { id: Mode; label: string; placeholder: string }[] = [
+const MODES: { id: TabId; label: string; placeholder: string }[] = [
   { id: "consumer", label: "📞 SCAM CHECK",    placeholder: "+1 555 123 4567  or  +44 7700 900000" },
   { id: "blue",     label: "📞 PHONE LOOKUP",  placeholder: "+1 800 555 0199  or  +49 30 12345678" },
   { id: "red",      label: "🌐 IP LOOKUP",     placeholder: "IP address or domain (e.g. 8.8.8.8 or google.com)" },
+  { id: "email",    label: "✉️ EMAIL LOOKUP",  placeholder: "user@example.com" },
+];
+
+const EXAMPLE_EMAILS = [
+  { label: "test@gmail.com",       note: "Free provider" },
+  { label: "info@apple.com",       note: "Corporate" },
+  { label: "user@mailinator.com",  note: "Disposable" },
 ];
 
 const DEPTHS: { id: Depth; label: string }[] = [
@@ -43,7 +50,10 @@ const DEPTHS: { id: Depth; label: string }[] = [
 // Helpers
 // ---------------------------------------------------------------------------
 
-type AnyResult = LookupResult | IpLookupResult;
+// Tab type extends Mode with email
+type TabId = Mode | "email";
+
+type AnyResult = LookupResult | IpLookupResult | EmailLookupResult;
 type HistoryEntry = AnyResult & { queriedAt: string };
 
 interface ReportSummary {
@@ -320,12 +330,14 @@ function ReportForm({
   number,
   onSuccess,
   onCancel,
+  initialCategory,
 }: {
   number: string;
   onSuccess: (category: string, newTotal: number) => void;
   onCancel: () => void;
+  initialCategory?: string;
 }) {
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(initialCategory ?? "");
   const [comment,  setComment]  = useState("");
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
@@ -704,6 +716,7 @@ function ResultCard({ result }: { result: LookupResult }) {
             number={lookupNumber}
             onSuccess={handleReportSuccess}
             onCancel={() => setShowForm(false)}
+            initialCategory={result.is_spam_confirmed ? "Scam Call" : undefined}
           />
         ) : (
           <button
@@ -967,10 +980,170 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
           ))}
         </div>
 
+        {/* Hosted domains (reverse IP lookup) */}
+        {result.hosted_domains && result.hosted_domains.length > 0 && (
+          <div>
+            <SectionLabel>HOSTED DOMAINS ON THIS IP ({result.hosted_domains.length})</SectionLabel>
+            <div className="border border-[var(--border)] rounded-sm bg-[#070910] p-3">
+              <div className="flex flex-wrap gap-1.5">
+                {result.hosted_domains.map(d => (
+                  <span
+                    key={d}
+                    className="font-mono text-[10px] tracking-[1px] px-2 py-0.5 border rounded-sm"
+                    style={{ borderColor: "rgba(100,150,255,0.25)", background: "rgba(100,150,255,0.06)", color: "#6496ff" }}
+                  >
+                    {d}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Flags */}
         <FlagsList flags={result.flags} />
 
         {/* AI analysis */}
+        <div>
+          <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
+          <AnalysisExpander text={result.raw} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Email result card
+// ---------------------------------------------------------------------------
+
+function EmailIndicator({ label, active, colour, inverse }: { label: string; active: boolean; colour: string; inverse?: boolean }) {
+  const isAlert = inverse ? !active : active;
+  return (
+    <div
+      className={`font-mono text-[10px] tracking-[1px] px-3 py-2 border rounded-sm flex items-center gap-1.5 ${isAlert ? "" : "opacity-30"}`}
+      style={isAlert
+        ? { borderColor: `${colour}55`, background: `${colour}12`, color: colour }
+        : { borderColor: "var(--border)", color: "var(--muted)" }}
+    >
+      <span>{isAlert ? "●" : "○"}</span>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function EmailResultCard({ result }: { result: EmailLookupResult }) {
+  const rc = riskColour(result.risk);
+
+  const getReport = useCallback(() =>
+    [
+      "PhoneScan Email Report",
+      `${result.email} — ${result.risk} Risk`,
+      result.summary, "",
+      `Domain: ${result.domain}`,
+      `Disposable: ${result.is_disposable ? "YES" : "No"}`,
+      `Free Provider: ${result.is_free_provider ? "Yes" : "No"}`,
+      `Blacklisted: ${result.blacklisted ? "YES" : "No"}`,
+      `Credentials Leaked: ${result.credentials_leaked ? "YES" : "No"}`,
+      `Data Breach: ${result.data_breach ? "YES" : "No"}`,
+      `Malicious Activity: ${result.malicious_activity ? "YES" : "No"}`,
+      result.profiles.length > 0 ? `Profiles: ${result.profiles.join(", ")}` : null,
+      "", "Findings:", ...result.flags.map(f => `• ${f}`),
+      "", "Analysis:", result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim(),
+    ].filter(s => s !== null).join("\n"),
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const getShare = useCallback(() =>
+    `${result.email} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+    [result] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const metaItems = [
+    { label: "EMAIL",        value: result.email },
+    { label: "DOMAIN",       value: result.domain },
+    { label: "REPUTATION",   value: result.domain_reputation ?? "—" },
+    { label: "REFERENCES",   value: String(result.references) },
+    { label: "DEPTH",        value: result.depth.toUpperCase() },
+  ];
+
+  return (
+    <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
+      {/* Header */}
+      <div className="px-6 py-4 border-b border-[var(--border)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
+              EMAIL ANALYSIS COMPLETE
+              <span className="ml-2 px-1.5 py-0.5 border border-[var(--border)] rounded-sm text-[9px]">
+                emailrep.io · groq
+              </span>
+            </div>
+            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
+              {result.email}
+            </div>
+            <div className="font-mono text-[12px] text-[var(--muted)] mt-0.5">
+              {result.domain}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 mt-1">
+            <CopyBtn label="COPY"  getText={getReport} />
+            <CopyBtn label="SHARE" getText={getShare}  />
+          </div>
+        </div>
+      </div>
+
+      <div className="px-6 py-5 space-y-5">
+        {/* Risk banner */}
+        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-3xl leading-none">{rc.icon}</span>
+          <div>
+            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+          </div>
+        </div>
+
+        {/* Threat indicators */}
+        <div>
+          <SectionLabel>THREAT INDICATORS</SectionLabel>
+          <div className="flex flex-wrap gap-2">
+            <EmailIndicator label="DISPOSABLE"          active={result.is_disposable}      colour="#ff3c5a" />
+            <EmailIndicator label="BLACKLISTED"         active={result.blacklisted}         colour="#ff3c5a" />
+            <EmailIndicator label="MALICIOUS ACTIVITY"  active={result.malicious_activity}  colour="#ff3c5a" />
+            <EmailIndicator label="CREDENTIALS LEAKED"  active={result.credentials_leaked}  colour="#ffb800" />
+            <EmailIndicator label="DATA BREACH"         active={result.data_breach}         colour="#ffb800" />
+            <EmailIndicator label="SPOOFABLE DOMAIN"    active={result.spoofable}           colour="#ffb800" />
+            <EmailIndicator label="FREE PROVIDER"       active={result.is_free_provider}    colour="#6496ff" />
+            <EmailIndicator label="SUSPICIOUS"          active={result.suspicious}          colour="#ffb800" />
+          </div>
+        </div>
+
+        {/* Meta grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {metaItems.map(({ label, value }) => (
+            <InfoCell key={label} label={label} value={value} />
+          ))}
+        </div>
+
+        {/* Social profiles */}
+        {result.profiles.length > 0 && (
+          <div>
+            <SectionLabel>LINKED PROFILES</SectionLabel>
+            <div className="flex flex-wrap gap-2">
+              {result.profiles.map(p => (
+                <span
+                  key={p}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border rounded-sm capitalize"
+                  style={{ borderColor: "rgba(0,255,65,0.25)", background: "rgba(0,255,65,0.05)", color: "var(--accent)" }}
+                >
+                  {p}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <FlagsList flags={result.flags} />
+
         <div>
           <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>
           <AnalysisExpander text={result.raw} />
@@ -1023,12 +1196,15 @@ function HistoryPanel({
       <div className="divide-y divide-[var(--border)]">
         {history.map((entry, i) => {
           const rc = riskColour(entry.risk);
-          const isIp = "ip" in entry;
+          const isIp    = "ip" in entry && !("email" in entry) && !("parsed" in entry);
+          const isEmail = "email" in entry && !("ip" in entry) && !("parsed" in entry);
           const displayVal = isIp
             ? (entry as IpLookupResult).ip
-            : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
-          const modeLabel = isIp ? "IP" : (entry as LookupResult).mode.toUpperCase();
-          const icon = isIp ? "🌐" : "📞";
+            : isEmail
+              ? (entry as EmailLookupResult).email
+              : ((entry as LookupResult).parsed.internationalFormat ?? (entry as LookupResult).parsed.raw);
+          const modeLabel = isIp ? "IP" : isEmail ? "EMAIL" : (entry as LookupResult).mode.toUpperCase();
+          const icon = isIp ? "🌐" : isEmail ? "✉️" : "📞";
           return (
             <button
               key={i}
@@ -1063,13 +1239,14 @@ function HistoryPanel({
 
 export default function Home() {
   const [number,    setNumber]    = useState("");
-  const [mode,      setMode]      = useState<Mode>("consumer");
+  const [mode,      setMode]      = useState<TabId>("consumer");
   const [depth,     setDepth]     = useState<Depth>("standard");
   const [loading,   setLoading]   = useState(false);
   const [result,    setResult]    = useState<AnyResult | null>(null);
   const [error,     setError]     = useState<string | null>(null);
   const [remaining, setRemaining] = useState<number | null>(null);
   const [history,   setHistory]   = useState<HistoryEntry[]>([]);
+  const [resultKey, setResultKey] = useState(0);
   const inputRef       = useRef<HTMLInputElement>(null);
   const myIpRef        = useRef<string | null>(null);
   const hasAutoRunRef  = useRef(false);
@@ -1146,18 +1323,24 @@ export default function Home() {
     const target = (raw ?? number).trim();
     if (!target) return;
 
-    // IP mode validation — accept IPs and domain names
+    // Validation per mode
     if (mode === "red" && !isValidIpOrDomain(target)) {
       setError("Invalid input. Enter a valid IP address (e.g. 8.8.8.8) or domain (e.g. google.com).");
+      return;
+    }
+    if (mode === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      setError("Please enter a valid email address (e.g. user@example.com).");
       return;
     }
 
     setLoading(true); setError(null); setResult(null);
     try {
-      const endpoint = mode === "red" ? "/api/iplookup" : "/api/lookup";
+      const endpoint = mode === "red" ? "/api/iplookup" : mode === "email" ? "/api/email" : "/api/lookup";
       const body = mode === "red"
         ? { ip: target, depth }
-        : { number: target, mode, depth };
+        : mode === "email"
+          ? { email: target, depth }
+          : { number: target, mode, depth };
 
       const res  = await fetch(endpoint, {
         method: "POST",
@@ -1173,6 +1356,7 @@ export default function Home() {
         return;
       }
       setResult(data);
+      setResultKey(k => k + 1);
       setHistory(prev => {
         const updated = [{ ...data, queriedAt: new Date().toLocaleTimeString() }, ...prev].slice(0, 20);
         saveHistory(updated);
@@ -1197,13 +1381,19 @@ export default function Home() {
 
   // Restore a history entry directly — no re-fetch
   const handleRestore = useCallback((entry: HistoryEntry) => {
-    const isIp = "ip" in entry;
+    const isIp    = "ip"    in entry;
+    const isEmail = "email" in entry && !("ip" in entry) && !("parsed" in entry);
     setResult(entry);
+    setResultKey(k => k + 1);
     setError(null);
     if (isIp) {
       const ipEntry = entry as IpLookupResult;
       setMode("red");
       setNumber(ipEntry.original_input ?? ipEntry.ip);
+    } else if (isEmail) {
+      const emailEntry = entry as EmailLookupResult;
+      setMode("email");
+      setNumber(emailEntry.email);
     } else {
       const phoneEntry = entry as LookupResult;
       setMode(phoneEntry.mode);
@@ -1312,7 +1502,7 @@ export default function Home() {
           <button
             key={m.id}
             onClick={() => { setMode(m.id); setResult(null); setError(null); }}
-            className={`flex-1 py-3 font-head font-bold text-[13px] tracking-[2px] border transition-all duration-150 ${
+            className={`flex-1 py-3 font-head font-bold text-[11px] sm:text-[13px] tracking-[1px] sm:tracking-[2px] border transition-all duration-150 ${
               i === 0 ? "rounded-tl-sm" : ""
             } ${
               i === MODES.length - 1 ? "rounded-tr-sm border-l-0" : i > 0 ? "border-l-0" : ""
@@ -1332,7 +1522,7 @@ export default function Home() {
           target="_blank"
           rel="noreferrer"
           aria-label="GitHub"
-          className="flex items-center px-4 border border-l-0 border-[var(--border)] bg-[var(--surface)] rounded-tr-sm text-[var(--muted)] hover:text-white transition-colors"
+          className="flex items-center px-3 border border-l-0 border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-white transition-colors shrink-0"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
@@ -1346,12 +1536,12 @@ export default function Home() {
         {/* Input section */}
         <div className="px-8 pt-7 pb-6 border-b border-[var(--border)]">
           <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
-            {mode === "red" ? "// ENTER IP ADDRESS OR DOMAIN" : "// ENTER NUMBER (with country code)"}
+            {mode === "red" ? "// ENTER IP ADDRESS OR DOMAIN" : mode === "email" ? "// ENTER EMAIL ADDRESS" : "// ENTER NUMBER (with country code)"}
           </span>
           <div className="flex gap-3">
             <input
               ref={inputRef}
-              type={mode === "red" ? "text" : "tel"}
+              type={mode === "red" ? "text" : mode === "email" ? "email" : "tel"}
               value={number}
               onChange={e => setNumber(e.target.value)}
               placeholder={MODES.find(m => m.id === mode)?.placeholder ?? "+1 555 123 4567"}
@@ -1396,14 +1586,31 @@ export default function Home() {
             ))}
           </div>
 
-          {/* Example chips */}
-          {mode !== "red" && (
+          {/* Example chips — phone */}
+          {mode !== "red" && mode !== "email" && (
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
               {EXAMPLE_NUMBERS.map(ex => (
                 <button
                   key={ex.number}
                   onClick={() => { setNumber(ex.number); lookup(ex.number); }}
+                  title={ex.note}
+                  className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                >
+                  {ex.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Example chips — email */}
+          {mode === "email" && (
+            <div className="flex flex-wrap items-center gap-2 mt-3">
+              <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">TRY:</span>
+              {EXAMPLE_EMAILS.map(ex => (
+                <button
+                  key={ex.label}
+                  onClick={() => { setNumber(ex.label); lookup(ex.label); }}
                   title={ex.note}
                   className="font-mono text-[10px] tracking-[1px] px-2.5 py-1 border border-[var(--border)] rounded-sm text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
                 >
@@ -1462,7 +1669,7 @@ export default function Home() {
               className="font-mono text-[12px] tracking-[2px] text-[var(--muted)]"
               style={{ animation: "pulse-text 1.4s ease-in-out infinite" }}
             >
-              {mode === "red" ? "QUERYING IP INTELLIGENCE..." : "QUERYING AI INTELLIGENCE..."}
+              {mode === "red" ? "QUERYING IP INTELLIGENCE..." : mode === "email" ? "QUERYING EMAIL INTELLIGENCE..." : "QUERYING AI INTELLIGENCE..."}
             </div>
           </div>
         )}
@@ -1474,13 +1681,33 @@ export default function Home() {
           </div>
         )}
 
-        {/* Result */}
+        {/* Result — animated on each new scan */}
         {result && !loading && (
-          <div className="p-6 border-t border-[var(--border)]">
-            {"ip" in result
-              ? <IpResultCard result={result as IpLookupResult} />
-              : <ResultCard   result={result as LookupResult}   />
-            }
+          <div
+            key={resultKey}
+            style={{ position: "relative", animation: "result-in 0.35s ease-out forwards" }}
+          >
+            {/* Scan sweep line */}
+            <div
+              style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0,
+                height: "2px",
+                background: "var(--accent)",
+                boxShadow: "0 0 12px var(--accent)",
+                animation: "scan-sweep 0.7s ease-in forwards",
+                pointerEvents: "none",
+                zIndex: 10,
+              }}
+            />
+            <div className="p-6 border-t border-[var(--border)]">
+              {"ip" in result && !("email" in result) && !("parsed" in result)
+                ? <IpResultCard    result={result as IpLookupResult}    />
+                : "email" in result && !("ip" in result) && !("parsed" in result)
+                  ? <EmailResultCard result={result as EmailLookupResult} />
+                  : <ResultCard      result={result as LookupResult}      />
+              }
+            </div>
           </div>
         )}
       </div>

@@ -244,9 +244,11 @@ export async function POST(req: NextRequest) {
   // ---------------------------------------------------------------------------
   // Fire all 7 sources in parallel
   // ---------------------------------------------------------------------------
+  const hackertargetUrl = `https://api.hackertarget.com/reverseiplookup/?q=${encodeURIComponent(ip)}`;
+
   const [
     ipApiRes, ipapiIsRes, getipintelRes,
-    abuseRes, dnsRes, rdapRes, torRes,
+    abuseRes, dnsRes, rdapRes, torRes, hackertargetRes,
   ] = await Promise.allSettled([
     fetch(ipApiUrl, fetchOpts).then(r => r.json()),
     fetch(ipapiIsUrl, fetchOpts).then(r => r.json()),
@@ -257,6 +259,7 @@ export async function POST(req: NextRequest) {
     dnsUrl ? fetch(dnsUrl, fetchOpts).then(r => r.json()) : Promise.resolve(null),
     fetch(rdapUrl, fetchOpts).then(r => r.json()),
     getTorExitNodes(),
+    fetch(hackertargetUrl, { cache: "no-store", signal: AbortSignal.timeout(6000) }).then(r => r.text()),
   ]);
 
   // ---------------------------------------------------------------------------
@@ -298,6 +301,19 @@ export async function POST(req: NextRequest) {
 
   // Tor
   const torSet = torRes.status === "fulfilled" ? torRes.value : new Set<string>();
+
+  // HackerTarget reverse IP — list of domains hosted on this IP
+  let hostedDomains: string[] = [];
+  if (hackertargetRes.status === "fulfilled" && typeof hackertargetRes.value === "string") {
+    const htText = hackertargetRes.value as string;
+    if (!htText.includes("error") && !htText.includes("API count") && !htText.includes("No records")) {
+      hostedDomains = htText
+        .split("\n")
+        .map(l => l.trim())
+        .filter(l => l && l.includes(".") && !l.startsWith("#"))
+        .slice(0, 20);
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Merge
@@ -407,6 +423,7 @@ export async function POST(req: NextRequest) {
 
   const result: IpLookupResult = {
     ...merged,
+    hosted_domains: hostedDomains,
     risk:    extracted?.risk    ?? "Unknown",
     summary: extracted?.summary ?? aiText.slice(0, 200).trim(),
     flags:   extracted?.flags   ?? [],

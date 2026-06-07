@@ -80,6 +80,30 @@ export interface IpLookupResult {
   // Domain resolution
   original_input: string;   // what the user typed (may be a domain)
   resolved_ip: string;      // the actual IP used for lookup
+  // Reverse IP — domains hosted on this IP (hackertarget)
+  hosted_domains: string[];
+  // AI
+  risk: RiskLevel;
+  summary: string;
+  flags: string[];
+  raw: string;
+  depth: Depth;
+}
+
+export interface EmailLookupResult {
+  email: string;
+  domain: string;
+  is_disposable: boolean;
+  is_free_provider: boolean;
+  suspicious: boolean;
+  references: number;
+  blacklisted: boolean;
+  credentials_leaked: boolean;
+  data_breach: boolean;
+  malicious_activity: boolean;
+  spoofable: boolean;
+  domain_reputation: string | null;
+  profiles: string[];
   // AI
   risk: RiskLevel;
   summary: string;
