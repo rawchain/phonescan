@@ -38,6 +38,8 @@ export default function IpMap({ lat, lon, city, region, country }: IpMapProps) {
 
   // Zoom 8 = city-region level — general area, not pinpoint (privacy best practice for IP geo)
   return (
+    <div style={{ filter: "invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%)" }}>
+      <style>{`.leaflet-marker-icon { filter: invert(100%) hue-rotate(180deg); }`}</style>
     <MapContainer
       center={[lat, lon]}
       zoom={8}
@@ -59,5 +61,6 @@ export default function IpMap({ lat, lon, city, region, country }: IpMapProps) {
         </Popup>
       </Marker>
     </MapContainer>
+    </div>
   );
 }

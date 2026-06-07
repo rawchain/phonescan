@@ -64,6 +64,8 @@ export default function PhoneMap({ location }: PhoneMapProps) {
   // Zoom 6 = country/region level — appropriate for phone geolocation (less precise than IP)
   return (
     <div>
+      <style>{`.leaflet-marker-icon { filter: invert(100%) hue-rotate(180deg); }`}</style>
+      <div style={{ filter: "invert(90%) hue-rotate(180deg) brightness(95%) contrast(90%)" }}>
       <MapContainer
         center={[coords.lat, coords.lon]}
         zoom={6}
@@ -85,6 +87,7 @@ export default function PhoneMap({ location }: PhoneMapProps) {
           </Popup>
         </Marker>
       </MapContainer>
+      </div>
       <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mt-2 text-center">
         {"// APPROXIMATE REGION · not exact location"}
       </div>
