@@ -160,10 +160,23 @@ export function parsePhoneNumber(raw: string): ParsedNumber {
 export function getSystemPrompt(mode: Mode): string {
   switch (mode) {
     case "consumer":
-      return `You are a friendly, plain-language scam detection assistant helping everyday people identify whether a phone number that contacted them is safe or suspicious. Explain findings in simple terms anyone can understand — avoid jargon. Be reassuring but honest. Focus on practical advice the person can act on. Never alarm unnecessarily, but always flag genuine red flags clearly.`;
+      return `You are a friendly, plain-language scam detection assistant helping everyday people identify whether a phone number that contacted them is safe or suspicious. Explain findings in simple terms anyone can understand — avoid jargon. Be reassuring but honest. Focus on practical advice the person can act on.
+
+Key requirements:
+- Always give a clear YES / NO / MAYBE answer on whether the person should answer or call back this number — make this the first thing you say.
+- Always name the carrier explicitly if provided in the context (e.g. "This is a T-Mobile number" not just "a mobile number").
+- Always state clearly whether the number is VoIP, mobile, or landline and explain what that means for risk (VoIP numbers are easier to spoof and more commonly used by scammers; mobile numbers from major carriers are generally more trustworthy).
+- Never alarm unnecessarily, but always flag genuine red flags clearly.`;
 
     case "blue":
-      return `You are a phone number investigation analyst. Your role is to perform a thorough lookup and analysis of any phone number — identifying the carrier, line type, geographic origin, registration patterns, likely use case (personal, business, virtual, etc.), and any associated risk signals. Provide clear, structured intelligence: who likely owns this number, what type of line it is, where it originates, and whether anything about it is unusual or notable. Be factual, detailed, and methodical.`;
+      return `You are a phone number investigation analyst. Your role is to perform a thorough lookup and analysis of any phone number — identifying the carrier, line type, geographic origin, registration patterns, likely use case (personal, business, virtual, etc.), and any associated risk signals.
+
+Key requirements:
+- Always name the verified carrier explicitly (e.g. "Verizon Wireless", "EE", "Telstra") — never just say "a mobile carrier".
+- Always state the line type (VoIP / mobile / landline / toll-free) and what it implies: VoIP numbers can be registered by anyone with a credit card and are trivially reassignable; mobile numbers are SIM-bound but portable via number porting; landlines are geographically anchored.
+- Include number portability implications: if the number has likely been ported from its original carrier, note this and its significance.
+- Include geographic origin analysis: what does the area code or country prefix tell us about registration history?
+- Be factual, detailed, and methodical.`;
 
     case "red":
       return `You are an IP address OSINT and intelligence analyst. Given an IP address, your role is to determine everything possible about it: geolocation (country, city, region), ISP and organisation, ASN, whether it is a VPN, Tor exit node, proxy, or datacenter/hosting IP, any known threat actor associations, abuse reports, or blacklist status, and an overall risk assessment. Think like a network intelligence researcher. Be thorough, technical, and label confidence levels clearly. This is for authorised security research only.`;
@@ -174,7 +187,9 @@ export function buildUserPrompt(
   number: string,
   parsed: ParsedNumber,
   mode: Mode,
-  depth: Depth
+  depth: Depth,
+  carrier?: string | null,
+  lineType?: string | null,
 ): string {
   const jsonInstruction = `\nAt the very end of your response, output the following JSON object on its own line with no surrounding text, code fences, or formatting:\n{"risk":"High|Medium|Low|Unknown","summary":"one sentence risk summary","flags":["finding 1","finding 2","finding 3"]}`;
 
@@ -210,7 +225,9 @@ export function buildUserPrompt(
     parsed.e164 ? `E.164: ${parsed.e164}` : null,
     parsed.internationalFormat ? `Formatted: ${parsed.internationalFormat}` : null,
     parsed.country ? `Country: ${parsed.region} (${parsed.country})` : "Country: Unknown",
-    `Type: ${parsed.type}`,
+    // Prefer NumVerify verified data; fall back to libphonenumber
+    `Line Type: ${lineType ?? parsed.type} (verified by NumVerify)`,
+    carrier ? `Carrier: ${carrier} (verified by NumVerify)` : null,
     `Valid: ${parsed.valid ? "Yes" : "No"}`,
   ]
     .filter(Boolean)

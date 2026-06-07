@@ -5,7 +5,8 @@ import dynamic from "next/dynamic";
 import type { LookupResult, IpLookupResult, Mode, Depth, RiskLevel } from "@/lib/phone";
 import { REPORT_CATEGORIES } from "@/lib/reportCategories";
 
-const IpMap = dynamic(() => import("@/components/IpMap"), { ssr: false });
+const IpMap    = dynamic(() => import("@/components/IpMap"),    { ssr: false });
+const PhoneMap = dynamic(() => import("@/components/PhoneMap"), { ssr: false });
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -420,7 +421,7 @@ function ResultCard({ result }: { result: LookupResult }) {
     { label: "CODE",      value: result.parsed.country ?? "—" },
     { label: "LINE TYPE", value: lineType.toUpperCase() },
     { label: "CARRIER",   value: carrier ?? "—" },
-    { label: "LOCATION",  value: result.number_location ?? "—" },
+    { label: "LOCATION",  value: result.number_location || result.parsed.region || "—" },
     { label: "E.164",     value: result.parsed.e164 ?? "—" },
     { label: "VALID",     value: (result.number_valid ?? result.parsed.valid) ? "YES ✓" : "NO ✗" },
     { label: "DEPTH",     value: result.depth.toUpperCase() },
@@ -550,6 +551,16 @@ function ResultCard({ result }: { result: LookupResult }) {
         </div>
 
         <FlagsList flags={result.flags} />
+
+        {/* Approximate region map */}
+        {(result.number_location || result.parsed.region) && (
+          <div>
+            <SectionLabel>APPROXIMATE REGION</SectionLabel>
+            <div className="rounded-sm overflow-hidden border border-[var(--border)]">
+              <PhoneMap location={result.number_location || result.parsed.region!} />
+            </div>
+          </div>
+        )}
 
         <div>
           <SectionLabel>AI INTELLIGENCE REPORT</SectionLabel>

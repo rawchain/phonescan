@@ -143,43 +143,49 @@ export async function POST(req: NextRequest) {
       }
     : parsePhoneNumber(number);
 
-  // --- Build prompts ---
+  // --- Build system prompt ---
   const systemPrompt = getSystemPrompt(mode);
-  const userPrompt = buildUserPrompt(number, parsed, mode, depth);
 
-  // --- Call Groq + NumVerify in parallel ---
+  // --- Fetch NumVerify first (fast ~1s) so carrier/lineType can enrich the Groq prompt ---
   const numVerifyKey = process.env.NUMVERIFY_API_KEY;
   const e164 = parsed.e164 ?? number.trim();
 
-  const numVerifyPromise = numVerifyKey && mode !== "red"
-    ? fetch(
-        `http://apilayer.net/api/validate?access_key=${numVerifyKey}&number=${encodeURIComponent(e164)}&format=1`,
-        { cache: "no-store", signal: AbortSignal.timeout(6000) }
-      )
-        .then(r => r.json())
-        .catch(() => null)
-    : Promise.resolve(null);
-
-  const groqPromise = groq.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.4,
-    max_tokens: MAX_TOKENS[depth],
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  });
-
-  let aiText: string;
   let numVerifyData: Record<string, unknown> | null = null;
 
-  try {
-    const [groqResult, numVerifyResult] = await Promise.all([groqPromise, numVerifyPromise]);
-    aiText = groqResult.choices[0]?.message?.content ?? "";
-    // NumVerify returns { valid: false, error: {...} } on bad key/number — only use if valid
-    if (numVerifyResult && numVerifyResult.valid !== false && !numVerifyResult.error) {
-      numVerifyData = numVerifyResult as Record<string, unknown>;
+  if (numVerifyKey && mode !== "red") {
+    try {
+      const nvRes = await fetch(
+        `http://apilayer.net/api/validate?access_key=${numVerifyKey}&number=${encodeURIComponent(e164)}&format=1`,
+        { cache: "no-store", signal: AbortSignal.timeout(5000) }
+      );
+      const nv = await nvRes.json() as Record<string, unknown>;
+      if (nv && nv.valid !== false && !nv.error) {
+        numVerifyData = nv;
+      }
+    } catch {
+      // NumVerify timed out or failed — continue without it
     }
+  }
+
+  // --- Build user prompt — now enriched with verified carrier + line type ---
+  const verifiedCarrier  = (numVerifyData?.carrier  as string | null | undefined) ?? null;
+  const verifiedLineType = (numVerifyData?.line_type as string | null | undefined) ?? null;
+  const userPrompt = buildUserPrompt(number, parsed, mode, depth, verifiedCarrier, verifiedLineType);
+
+  // --- Call Groq ---
+  let aiText: string;
+
+  try {
+    const groqResult = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      temperature: 0.4,
+      max_tokens: MAX_TOKENS[depth],
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+    aiText = groqResult.choices[0]?.message?.content ?? "";
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Failed to contact AI service.";
@@ -201,8 +207,8 @@ export async function POST(req: NextRequest) {
     mode,
     depth,
     // NumVerify enrichment
-    carrier:            (numVerifyData?.carrier as string | null | undefined) ?? null,
-    line_type_verified: (numVerifyData?.line_type as string | null | undefined) ?? null,
+    carrier:            verifiedCarrier,
+    line_type_verified: verifiedLineType,
     number_valid:       numVerifyData?.valid != null ? Boolean(numVerifyData.valid) : null,
     number_location:    (numVerifyData?.location as string | null | undefined) ?? null,
   };
