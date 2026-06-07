@@ -486,8 +486,10 @@ function ResultCard({ result }: { result: LookupResult }) {
      "Findings:", ...result.flags.map(f => `• ${f}`), "", "Analysis:", cleanAnalysis].join("\n"),
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const getShare = useCallback(() =>
-    `${displayNum} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+  const getShare = useCallback(() => {
+    const q = encodeURIComponent(result.parsed.e164 ?? result.parsed.raw);
+    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=${result.mode}`;
+  },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -554,8 +556,8 @@ function ResultCard({ result }: { result: LookupResult }) {
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"  getText={getReport} />
-            <CopyBtn label="SHARE" getText={getShare}  />
+            <CopyBtn label="COPY"     getText={getReport} />
+            <CopyBtn label="🔗 LINK"  getText={getShare}  />
           </div>
         </div>
       </div>
@@ -852,8 +854,10 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
     ].filter(s => s !== null).join("\n"),
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const getShare = useCallback(() =>
-    `${result.ip} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+  const getShare = useCallback(() => {
+    const q = encodeURIComponent(result.original_input ?? result.ip);
+    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=red`;
+  },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -898,8 +902,8 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
             <div className="font-mono text-[12px] text-[var(--muted)] mt-1">{flag} {locationStr}</div>
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"  getText={getReport} />
-            <CopyBtn label="SHARE" getText={getShare}  />
+            <CopyBtn label="COPY"     getText={getReport} />
+            <CopyBtn label="🔗 LINK"  getText={getShare}  />
           </div>
         </div>
       </div>
@@ -1053,8 +1057,10 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
     ].filter(s => s !== null).join("\n"),
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
-  const getShare = useCallback(() =>
-    `${result.email} scanned on PhoneScan — ${result.risk} risk. ${result.summary} phonescan-gamma.vercel.app`,
+  const getShare = useCallback(() => {
+    const q = encodeURIComponent(result.email);
+    return `https://phonescan-gamma.vercel.app/?q=${q}&mode=email`;
+  },
     [result] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -1086,8 +1092,8 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"  getText={getReport} />
-            <CopyBtn label="SHARE" getText={getShare}  />
+            <CopyBtn label="COPY"     getText={getReport} />
+            <CopyBtn label="🔗 LINK"  getText={getShare}  />
           </div>
         </div>
       </div>
@@ -1247,9 +1253,14 @@ export default function Home() {
   const [remaining, setRemaining] = useState<number | null>(null);
   const [history,   setHistory]   = useState<HistoryEntry[]>([]);
   const [resultKey, setResultKey] = useState(0);
+  const [bulkMode,  setBulkMode]  = useState(false);
+  const [bulkInput, setBulkInput] = useState("");
+  const [bulkResults, setBulkResults] = useState<Array<{ target: string; risk: string; summary: string; error?: string }>>([]);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
   const inputRef       = useRef<HTMLInputElement>(null);
   const myIpRef        = useRef<string | null>(null);
   const hasAutoRunRef  = useRef(false);
+  const hasUrlRunRef   = useRef(false);
   const canvasRef      = useRef<HTMLCanvasElement>(null);
 
   // Matrix rain background
@@ -1319,6 +1330,24 @@ export default function Home() {
   // Load history from localStorage after mount (avoids SSR hydration mismatch)
   useEffect(() => { setHistory(loadHistory()); }, []);
 
+  // Read ?q= URL param on mount — auto-fill + auto-scan (enables shareable links)
+  useEffect(() => {
+    if (hasUrlRunRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    const m = params.get("mode") as TabId | null;
+    if (!q) return;
+    hasUrlRunRef.current = true;
+    const resolvedMode: TabId = (m && ["consumer","blue","red","email"].includes(m)) ? m : "consumer";
+    setMode(resolvedMode);
+    setNumber(q);
+    // Brief delay so state settles before lookup fires
+    setTimeout(() => lookup(q), 100);
+    // Clean URL without reloading
+    window.history.replaceState({}, "", window.location.pathname);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const lookup = useCallback(async (raw?: string) => {
     const target = (raw ?? number).trim();
     if (!target) return;
@@ -1368,6 +1397,37 @@ export default function Home() {
       setLoading(false);
     }
   }, [number, mode, depth]);
+
+  const runBulk = useCallback(async () => {
+    const lines = bulkInput.split("\n").map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    setBulkResults([]);
+    setBulkProgress({ current: 0, total: lines.length });
+    for (let i = 0; i < lines.length; i++) {
+      const target = lines[i];
+      setBulkProgress({ current: i + 1, total: lines.length });
+      const isIpLike = isValidIpOrDomain(target) && !/^\+/.test(target) && !/^\d{3}/.test(target);
+      const isEmailLike = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target);
+      const endpoint = isEmailLike ? "/api/email" : isIpLike ? "/api/iplookup" : "/api/lookup";
+      const body = isEmailLike ? { email: target, depth: "quick" }
+        : isIpLike ? { ip: target, depth: "quick" }
+        : { number: target, mode: "consumer", depth: "quick" };
+      try {
+        const res = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        const data = await res.json() as AnyResult & { error?: string };
+        if (!res.ok || data.error) {
+          setBulkResults(prev => [...prev, { target, risk: "—", summary: data.error ?? "Error", error: data.error }]);
+        } else {
+          setBulkResults(prev => [...prev, { target, risk: data.risk, summary: data.summary }]);
+        }
+      } catch {
+        setBulkResults(prev => [...prev, { target, risk: "—", summary: "Network error", error: "Network error" }]);
+      }
+      // Brief pause between requests to avoid rate limit
+      if (i < lines.length - 1) await new Promise(r => setTimeout(r, 800));
+    }
+    setBulkProgress(null);
+  }, [bulkInput]);
 
   const fetchMyIp = useCallback(async () => {
     try {
@@ -1538,6 +1598,63 @@ export default function Home() {
           <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
             {mode === "red" ? "// ENTER IP ADDRESS OR DOMAIN" : mode === "email" ? "// ENTER EMAIL ADDRESS" : "// ENTER NUMBER (with country code)"}
           </span>
+          {bulkMode ? (
+            <div className="space-y-3">
+              <textarea
+                value={bulkInput}
+                onChange={e => setBulkInput(e.target.value)}
+                placeholder={`+1 800 555 0199\n+44 20 7946 0958\n8.8.8.8\nuser@gmail.com`}
+                rows={5}
+                className="w-full bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[13px] tracking-[1px] text-white px-4 py-3 outline-none resize-none placeholder:text-[var(--muted)] placeholder:text-[11px] transition-all"
+                onFocus={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.boxShadow = "0 0 0 1px var(--accent)"; }}
+                onBlur={e => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.boxShadow = ""; }}
+              />
+              <button
+                onClick={runBulk}
+                disabled={!bulkInput.trim() || bulkProgress !== null}
+                className="font-head font-bold text-[14px] tracking-[3px] px-6 py-3 rounded-sm text-black w-full transition-all disabled:opacity-40"
+                style={{ background: "#00c136" }}
+              >
+                {bulkProgress ? `SCANNING ${bulkProgress.current}/${bulkProgress.total}...` : "⚡ BULK SCAN"}
+              </button>
+              {/* Bulk results table */}
+              {bulkResults.length > 0 && (
+                <div className="border border-[var(--border)] rounded-sm overflow-hidden">
+                  <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] px-4 py-2 bg-[#070910] border-b border-[var(--border)]">
+                    {"// BULK RESULTS"}
+                  </div>
+                  <div className="divide-y divide-[var(--border)]">
+                    {bulkResults.map((r, i) => {
+                      const rc = r.error ? { text: "text-[var(--muted)]", border: "" } : riskColour(r.risk as RiskLevel);
+                      return (
+                        <div key={i} className="px-4 py-2.5 bg-[#070910] flex items-start gap-3 flex-wrap">
+                          <span className="font-mono text-[11px] text-[var(--muted)] shrink-0 w-5">{i + 1}</span>
+                          <span className={`font-mono text-[12px] tracking-wide shrink-0 ${rc.text}`}>{r.target}</span>
+                          {!r.error && (
+                            <span className={`font-mono text-[10px] tracking-[2px] px-2 py-0.5 border rounded-sm shrink-0 ${rc.text} ${rc.border}`}>
+                              {r.risk.toUpperCase()}
+                            </span>
+                          )}
+                          <span className="font-mono text-[10px] text-[var(--muted)] flex-1 min-w-0 truncate">{r.summary}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {bulkProgress === null && (
+                    <button
+                      onClick={() => {
+                        const text = bulkResults.map(r => `${r.target}\t${r.risk}\t${r.summary}`).join("\n");
+                        navigator.clipboard.writeText(text);
+                      }}
+                      className="w-full font-mono text-[10px] tracking-[2px] text-[var(--muted)] hover:text-[var(--accent)] py-2 transition-colors border-t border-[var(--border)]"
+                    >
+                      COPY RESULTS AS TSV
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="flex gap-3">
             <input
               ref={inputRef}
@@ -1545,7 +1662,7 @@ export default function Home() {
               value={number}
               onChange={e => setNumber(e.target.value)}
               placeholder={MODES.find(m => m.id === mode)?.placeholder ?? "+1 555 123 4567"}
-              maxLength={mode === "red" ? 45 : 20}
+              maxLength={mode === "red" ? 45 : 50}
               className="flex-1 bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[16px] tracking-[2px] text-white px-4 py-3.5 outline-none placeholder:text-[var(--muted)] placeholder:text-[13px] transition-all"
               onFocus={e => {
                 e.currentTarget.style.borderColor = "var(--accent)";
@@ -1566,6 +1683,22 @@ export default function Home() {
             >
               {loading ? "SCANNING..." : "SCAN"}
             </button>
+          </div>
+          )}
+
+          {/* Bulk toggle */}
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              onClick={() => { setBulkMode(v => !v); setBulkResults([]); setBulkProgress(null); }}
+              className={`font-mono text-[10px] tracking-[2px] px-3 py-1 border rounded-sm transition-all ${
+                bulkMode
+                  ? "border-[var(--accent)] text-[var(--accent)] bg-[rgba(0,255,65,0.06)]"
+                  : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+              }`}
+            >
+              {bulkMode ? "✕ SINGLE MODE" : "⚡ BULK SCAN"}
+            </button>
+            {bulkMode && <span className="font-mono text-[10px] text-[var(--muted)]">paste one per line</span>}
           </div>
 
           {/* Depth selector */}
