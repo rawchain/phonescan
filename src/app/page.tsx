@@ -447,7 +447,7 @@ function ResultCard({ result }: { result: LookupResult }) {
                 </span>
               )}
             </div>
-            <div className="font-mono text-xl text-white tracking-[2px] break-all">{displayNum}</div>
+            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{displayNum}</div>
             {/* Carrier + VOIP badge */}
             {carrier && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -757,7 +757,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
                 ip-api · ipapi.is · abuseipdb · greynoise · groq
               </span>
             </div>
-            <div className="font-mono text-xl text-white tracking-[2px] break-all">{result.ip}</div>
+            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{result.ip}</div>
             {result.original_input !== result.resolved_ip && (
               <div className="font-mono text-[11px] text-[var(--accent)] opacity-70 mt-0.5">
                 ↳ resolved from {result.original_input}
@@ -959,6 +959,71 @@ export default function Home() {
   const inputRef       = useRef<HTMLInputElement>(null);
   const myIpRef        = useRef<string | null>(null);
   const hasAutoRunRef  = useRef(false);
+  const canvasRef      = useRef<HTMLCanvasElement>(null);
+
+  // Matrix rain background
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d")!;
+    if (!ctx) return;
+
+    const CHARS =
+      "ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノ" +
+      "ハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロワヲン" +
+      "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    const FONT_SIZE = 14;
+    const TRAIL     = 8;
+
+    let cols: number[]   = [];
+    let speeds: number[] = [];
+    let animId: number;
+
+    function resize() {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const numCols = Math.floor(canvas.width / FONT_SIZE);
+      cols   = Array.from({ length: numCols }, () => Math.random() * canvas.height);
+      speeds = Array.from({ length: numCols }, () => 0.4 + Math.random() * 1.4);
+    }
+
+    resize();
+    window.addEventListener("resize", resize);
+
+    function draw() {
+      // Redraw opaque background each frame — no trailing glow buildup
+      ctx.fillStyle = "#0a0c0f";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.font = `${FONT_SIZE}px "Share Tech Mono", monospace`;
+
+      for (let i = 0; i < cols.length; i++) {
+        for (let t = 0; t < TRAIL; t++) {
+          const y = cols[i] - t * FONT_SIZE;
+          if (y < -FONT_SIZE || y > canvas.height) continue;
+          const ch = CHARS[Math.floor(Math.random() * CHARS.length)];
+          // Head brightest (~0.055), trail fades to ~0.002
+          const opacity = Math.max(0, 0.055 - t * 0.007);
+          ctx.fillStyle = `rgba(0,255,65,${opacity.toFixed(3)})`;
+          ctx.fillText(ch, i * FONT_SIZE, y);
+        }
+        cols[i] += speeds[i];
+        if (cols[i] > canvas.height + TRAIL * FONT_SIZE) {
+          cols[i]   = -FONT_SIZE;
+          speeds[i] = 0.4 + Math.random() * 1.4;
+        }
+      }
+
+      animId = requestAnimationFrame(draw);
+    }
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", resize);
+    };
+  }, []);
 
   // Load history from localStorage after mount (avoids SSR hydration mismatch)
   useEffect(() => { setHistory(loadHistory()); }, []);
@@ -1067,18 +1132,36 @@ export default function Home() {
   }, [lookup]);
 
   return (
-    <div
-      className="min-h-screen flex flex-col items-center px-4 py-10"
-      style={{
-        background: `
-          radial-gradient(ellipse at 20% 0%,   rgba(0,255,136,0.04) 0%, transparent 60%),
-          radial-gradient(ellipse at 80% 100%, rgba(255,60,90,0.04)  0%, transparent 60%),
-          repeating-linear-gradient(0deg,   transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
-          repeating-linear-gradient(90deg,  transparent, transparent 40px, rgba(255,255,255,0.01) 40px, rgba(255,255,255,0.01) 41px),
-          #0a0c10
-        `,
-      }}
-    >
+    <>
+      {/* Matrix rain canvas — fixed behind everything */}
+      <canvas
+        ref={canvasRef}
+        style={{ position: "fixed", inset: 0, zIndex: -1, pointerEvents: "none" }}
+      />
+
+      {/* Credit bar */}
+      <div
+        className="font-jb w-full text-center"
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          letterSpacing: "0.3em",
+          color: "#00ff41",
+          background: "rgba(0,255,65,0.03)",
+          borderTop: "1px solid rgba(0,255,65,0.12)",
+          borderBottom: "1px solid rgba(0,255,65,0.06)",
+          padding: "6px 0",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        MADE BY RAWCHAIN &amp; RAIZEL
+      </div>
+
+      <div
+        className="min-h-screen flex flex-col items-center px-4 py-10"
+        style={{ position: "relative", zIndex: 1 }}
+      >
       {/* Header */}
       <header className="text-center mb-8 w-full max-w-[700px]">
         <div className="font-mono text-[11px] tracking-[6px] text-[var(--accent)] opacity-70 mb-2">
@@ -1115,7 +1198,7 @@ export default function Home() {
                 ? "text-[var(--accent)] border-[var(--border)] bg-[var(--surface)]"
                 : "text-[var(--muted)] border-[var(--border)] bg-[var(--surface)] hover:bg-[#141a22]"
             }`}
-            style={mode === m.id ? { borderBottomColor: "var(--surface)" } : {}}
+            style={mode === m.id ? { borderBottomColor: "rgba(10,12,15,0.85)", borderTopColor: "var(--accent)" } : {}}
           >
             {m.label}
           </button>
@@ -1164,9 +1247,9 @@ export default function Home() {
               onClick={() => lookup()}
               disabled={loading || !number.trim()}
               className="font-head font-bold text-[14px] tracking-[3px] px-6 rounded-sm text-black whitespace-nowrap transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: "var(--accent)" }}
-              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#00ffaa"; e.currentTarget.style.boxShadow = "var(--glow)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
-              onMouseLeave={e => { e.currentTarget.style.background = "var(--accent)"; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.transform = ""; }}
+              style={{ background: "#00c136" }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#00e63f"; e.currentTarget.style.boxShadow = "var(--glow)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
+              onMouseLeave={e => { e.currentTarget.style.background = "#00c136"; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.transform = ""; }}
             >
               {loading ? "SCANNING..." : "SCAN"}
             </button>
@@ -1290,6 +1373,7 @@ export default function Home() {
       <footer className="mt-7 font-mono text-[11px] tracking-[1px] text-[var(--muted)] text-center opacity-50">
         We are not responsible for how you use this · {new Date().getFullYear()}
       </footer>
-    </div>
+      </div>
+    </>
   );
 }
