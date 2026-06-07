@@ -167,10 +167,83 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // --- Build user prompt — now enriched with verified carrier + line type ---
+  // --- Derived carrier/line type from NumVerify ---
   const verifiedCarrier  = (numVerifyData?.carrier  as string | null | undefined) ?? null;
   const verifiedLineType = (numVerifyData?.line_type as string | null | undefined) ?? null;
-  const userPrompt = buildUserPrompt(number, parsed, mode, depth, verifiedCarrier, verifiedLineType);
+
+  // --- Run CallTracer, SkipCalls, and Groq in parallel ---
+  const digits = e164.replace(/^\+/, ""); // strip leading + for CallTracer
+
+  const callTracerPromise = mode !== "red"
+    ? fetch(`https://calltracer.io/api/lookup/${digits}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
+        headers: { "User-Agent": "PhoneScan/1.0" },
+      }).then(r => r.ok ? r.json() : null).catch(() => null)
+    : Promise.resolve(null);
+
+  const skipCallsPromise = mode !== "red"
+    ? fetch(`https://spam.skipcalls.com/check/${encodeURIComponent(e164)}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(6000),
+        headers: { "User-Agent": "PhoneScan/1.0" },
+      }).then(r => r.ok ? r.json() : null).catch(() => null)
+    : Promise.resolve(null);
+
+  // Build prompt now (spam data not yet available — will be enriched after parallel calls)
+  // We fire Groq after getting spam data so AI sees the scores
+  const [callTracerResult, skipCallsResult] = await Promise.all([
+    callTracerPromise,
+    skipCallsPromise,
+  ]);
+
+  // --- Parse CallTracer response ---
+  interface CallTracerData {
+    spam_score?: number;
+    reports?: { total?: number; last_reported_at?: string };
+    carrier?: string;
+    location?: string;
+    number_type?: string;
+    timezones?: string[];
+  }
+  const ct = callTracerResult as CallTracerData | null;
+  const ctSpamScore       = typeof ct?.spam_score === "number" ? ct.spam_score : null;
+  const ctReports         = typeof ct?.reports?.total === "number" ? ct.reports.total : 0;
+  const ctLastReported    = ct?.reports?.last_reported_at ?? null;
+  const ctCarrier         = ct?.carrier ?? null;
+  const ctTimezone        = Array.isArray(ct?.timezones) && ct!.timezones.length > 0 ? ct!.timezones[0] : null;
+
+  // --- Parse SkipCalls response ---
+  interface SkipCallsData {
+    isSpam?: boolean;
+    reportCount?: number;
+    lastReported?: string;
+  }
+  const sc = skipCallsResult as SkipCallsData | null;
+  const scIsSpam       = sc?.isSpam === true;
+  const scReports      = typeof sc?.reportCount === "number" ? sc.reportCount : 0;
+  const scLastReported = sc?.lastReported ?? null;
+
+  // --- Merge spam signals ---
+  const externalReports = ctReports + scReports;
+  const lastReported = (() => {
+    const dates = [ctLastReported, scLastReported].filter(Boolean) as string[];
+    if (dates.length === 0) return null;
+    return dates.reduce((a, b) => (a > b ? a : b));
+  })();
+  const isSpamConfirmed = scIsSpam || (ctSpamScore != null && ctSpamScore > 60);
+
+  // --- Carrier fallback: use CallTracer if NumVerify returned nothing useful ---
+  const effectiveCarrier = (verifiedCarrier && verifiedCarrier !== "Unknown")
+    ? verifiedCarrier
+    : (ctCarrier ?? verifiedCarrier);
+
+  // --- Build enriched user prompt ---
+  const userPrompt = buildUserPrompt(
+    number, parsed, mode, depth,
+    effectiveCarrier, verifiedLineType,
+    ctSpamScore, externalReports > 0 ? externalReports : null,
+  );
 
   // --- Call Groq ---
   let aiText: string;
@@ -207,10 +280,16 @@ export async function POST(req: NextRequest) {
     mode,
     depth,
     // NumVerify enrichment
-    carrier:            verifiedCarrier,
+    carrier:            effectiveCarrier,
     line_type_verified: verifiedLineType,
     number_valid:       numVerifyData?.valid != null ? Boolean(numVerifyData.valid) : null,
     number_location:    (numVerifyData?.location as string | null | undefined) ?? null,
+    // Spam intelligence
+    spam_score:         ctSpamScore,
+    external_reports:   externalReports > 0 ? externalReports : null,
+    last_reported:      lastReported,
+    is_spam_confirmed:  isSpamConfirmed,
+    caller_timezone:    ctTimezone,
   };
 
   return NextResponse.json(result, {

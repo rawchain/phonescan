@@ -29,11 +29,17 @@ export interface LookupResult {
   parsed: ParsedNumber;
   mode: Mode;
   depth: Depth;
-  // NumVerify enrichment (optional — only present when API key is configured)
+  // NumVerify enrichment
   carrier: string | null;
   line_type_verified: string | null;
   number_valid: boolean | null;
   number_location: string | null;
+  // CallTracer + SkipCalls enrichment
+  spam_score: number | null;
+  external_reports: number | null;
+  last_reported: string | null;
+  is_spam_confirmed: boolean;
+  caller_timezone: string | null;
 }
 
 export interface IpLookupResult {
@@ -190,6 +196,8 @@ export function buildUserPrompt(
   depth: Depth,
   carrier?: string | null,
   lineType?: string | null,
+  spamScore?: number | null,
+  externalReports?: number | null,
 ): string {
   const jsonInstruction = `\nAt the very end of your response, output the following JSON object on its own line with no surrounding text, code fences, or formatting:\n{"risk":"High|Medium|Low|Unknown","summary":"one sentence risk summary","flags":["finding 1","finding 2","finding 3"]}`;
 
@@ -229,6 +237,9 @@ export function buildUserPrompt(
     `Line Type: ${lineType ?? parsed.type} (verified by NumVerify)`,
     carrier ? `Carrier: ${carrier} (verified by NumVerify)` : null,
     `Valid: ${parsed.valid ? "Yes" : "No"}`,
+    // Spam intelligence from CallTracer + SkipCalls
+    spamScore != null ? `Spam Score: ${spamScore}/100 (community spam database)` : null,
+    externalReports != null ? `Community Spam Reports: ${externalReports}` : null,
   ]
     .filter(Boolean)
     .join("\n");

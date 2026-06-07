@@ -281,6 +281,34 @@ function FlagsList({ flags }: { flags: string[] }) {
 }
 
 // ---------------------------------------------------------------------------
+// Score bar (shared between phone + IP result cards)
+// ---------------------------------------------------------------------------
+
+function ScoreBar({ label, score, lowGood }: { label: string; score: number | null; lowGood?: boolean }) {
+  if (score === null) return null;
+  const pct = Math.min(100, Math.max(0, score));
+  const colour = lowGood
+    ? (pct <= 20 ? "#00ff41" : pct <= 60 ? "#ffb800" : "#ff3c5a")
+    : (pct >= 61 ? "#ff3c5a" : pct >= 31 ? "#ffb800" : "#00ff41");
+  return (
+    <div>
+      <div className="flex justify-between mb-1.5">
+        <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] uppercase">{label}</span>
+        <span className="font-mono text-[11px] tracking-[1px]" style={{ color: colour }}>{score}/100</span>
+      </div>
+      <div className="h-[6px] bg-[#070910] rounded-full border border-[var(--border)] overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${pct}%`, background: colour, boxShadow: `0 0 6px ${colour}` }} />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="font-mono text-[9px] text-[var(--muted)]">CLEAN</span>
+        <span className="font-mono text-[9px] text-[var(--muted)]">MALICIOUS</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Phone result card
 // ---------------------------------------------------------------------------
 
@@ -376,6 +404,25 @@ function ReportForm({
 
 const HIGH_RISK_VOIP_CARRIERS = ["Google", "Twilio", "Bandwidth", "Vonage", "Telnyx", "Skype", "TextNow"];
 
+function getLocalTime(timezone: string): { time: string; isOddHours: boolean } {
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const timeStr = fmt.format(new Date());
+    const hourFmt = new Intl.DateTimeFormat("en-US", { timeZone: timezone, hour: "numeric", hour12: false });
+    const hour = parseInt(hourFmt.format(new Date()), 10);
+    // Odd hours = 9pm (21) to 7am (6)
+    const isOddHours = hour >= 21 || hour < 7;
+    return { time: timeStr, isOddHours };
+  } catch {
+    return { time: "—", isOddHours: false };
+  }
+}
+
 function ResultCard({ result }: { result: LookupResult }) {
   const displayNum    = result.parsed.internationalFormat ?? result.parsed.raw;
   const cleanAnalysis = result.raw.replace(/\{[^}]*"risk"[^}]*\}\s*$/, "").trim();
@@ -388,6 +435,9 @@ function ResultCard({ result }: { result: LookupResult }) {
     ? HIGH_RISK_VOIP_CARRIERS.some(v => carrier.toLowerCase().includes(v.toLowerCase()))
     : false;
   const isInvalid = result.number_valid === false;
+
+  // Local time in caller's timezone
+  const localTime = result.caller_timezone ? getLocalTime(result.caller_timezone) : null;
 
   // Community reports state
   const [community,    setCommunity]   = useState<ReportSummary | null>(null);
@@ -430,16 +480,17 @@ function ResultCard({ result }: { result: LookupResult }) {
   );
 
   const metaItems = [
-    { label: "NUMBER",    value: displayNum },
-    { label: "COUNTRY",   value: result.parsed.region ?? "—" },
-    { label: "CODE",      value: result.parsed.country ?? "—" },
-    { label: "LINE TYPE", value: lineType.toUpperCase() },
-    { label: "CARRIER",   value: carrier ?? "Unknown" },
-    { label: "LOCATION",  value: result.number_location || result.parsed.region || "—" },
-    { label: "E.164",     value: result.parsed.e164 ?? "—" },
-    { label: "VALID",     value: (result.number_valid ?? result.parsed.valid) ? "YES ✓" : "NO ✗" },
-    { label: "DEPTH",     value: result.depth.toUpperCase() },
-    { label: "MODE",      value: result.mode.toUpperCase() },
+    { label: "NUMBER",     value: displayNum },
+    { label: "COUNTRY",    value: result.parsed.region ?? "—" },
+    { label: "CODE",       value: result.parsed.country ?? "—" },
+    { label: "LINE TYPE",  value: lineType.toUpperCase() },
+    { label: "CARRIER",    value: carrier ?? "Unknown" },
+    { label: "LOCATION",   value: result.number_location || result.parsed.region || "—" },
+    { label: "LOCAL TIME", value: localTime?.time ?? "—" },
+    { label: "E.164",      value: result.parsed.e164 ?? "—" },
+    { label: "VALID",      value: (result.number_valid ?? result.parsed.valid) ? "YES ✓" : "NO ✗" },
+    { label: "DEPTH",      value: result.depth.toUpperCase() },
+    { label: "MODE",       value: result.mode.toUpperCase() },
   ];
 
   return (
@@ -520,6 +571,38 @@ function ResultCard({ result }: { result: LookupResult }) {
           </div>
         </div>
 
+        {/* Confirmed spam banner */}
+        {result.is_spam_confirmed && (
+          <div className="flex items-center gap-3 px-4 py-3 border border-[rgba(255,60,90,0.4)] bg-[rgba(255,60,90,0.08)] rounded-sm">
+            <span className="text-xl leading-none shrink-0">⚠️</span>
+            <div>
+              <div className="font-head font-bold tracking-[2px] text-[#ff3c5a] text-[15px]">CONFIRMED SPAM</div>
+              <div className="font-head text-[13px] text-[var(--muted)] mt-0.5">
+                This number has been confirmed as spam by community databases.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Spam score bar */}
+        {result.spam_score !== null && (
+          <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-4 py-4 space-y-3">
+            <ScoreBar label="SPAM SCORE" score={result.spam_score} lowGood />
+            <div className="flex flex-wrap gap-4">
+              {result.external_reports != null && result.external_reports > 0 && (
+                <span className="font-mono text-[10px] text-[var(--muted)]">
+                  {result.external_reports} community {result.external_reports === 1 ? "report" : "reports"}
+                </span>
+              )}
+              {result.last_reported && (
+                <span className="font-mono text-[10px] text-[var(--muted)]">
+                  Last reported: {new Date(result.last_reported).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Community flagged banner */}
         {community !== null && community.count >= 3 && (
           <div className="flex items-start gap-3 px-4 py-3 border border-[rgba(255,60,90,0.4)] bg-[rgba(255,60,90,0.07)] rounded-sm">
@@ -560,7 +643,20 @@ function ResultCard({ result }: { result: LookupResult }) {
         {/* Meta grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {metaItems.map(({ label, value }) =>
-            label === "CARRIER" ? (
+            label === "LOCAL TIME" && localTime ? (
+              <div key="LOCAL TIME" className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
+                <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">LOCAL TIME</div>
+                <div className="font-head font-semibold text-[15px] text-white truncate leading-tight">{localTime.time}</div>
+                {localTime.isOddHours && (
+                  <span
+                    className="font-mono text-[8px] tracking-[1px] px-1.5 py-0.5 border rounded-sm mt-1 inline-block"
+                    style={{ borderColor: "rgba(255,184,0,0.4)", background: "rgba(255,184,0,0.08)", color: "#ffb800" }}
+                  >
+                    🌙 Odd hours
+                  </span>
+                )}
+              </div>
+            ) : label === "CARRIER" ? (
               <div key="CARRIER" className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
                 <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">CARRIER</div>
                 <div className="font-head font-semibold text-[15px] text-white truncate leading-tight" title={value}>
@@ -694,30 +790,6 @@ function AbuseReports({ reports }: { reports: AbuseReport[] }) {
           {expanded ? "← Show fewer" : `Show all ${reports.length} reports →`}
         </button>
       )}
-    </div>
-  );
-}
-
-function ScoreBar({ label, score, lowGood }: { label: string; score: number | null; lowGood?: boolean }) {
-  if (score === null) return null;
-  const pct = Math.min(100, Math.max(0, score));
-  const colour = lowGood
-    ? (pct <= 20 ? "#00ff88" : pct <= 60 ? "#ffb800" : "#ff3c5a")
-    : (pct >= 61 ? "#ff3c5a" : pct >= 31 ? "#ffb800" : "#00ff88");
-  return (
-    <div>
-      <div className="flex justify-between mb-1.5">
-        <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] uppercase">{label}</span>
-        <span className="font-mono text-[11px] tracking-[1px]" style={{ color: colour }}>{score}/100</span>
-      </div>
-      <div className="h-[6px] bg-[#070910] rounded-full border border-[var(--border)] overflow-hidden">
-        <div className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: colour, boxShadow: `0 0 6px ${colour}` }} />
-      </div>
-      <div className="flex justify-between mt-1">
-        <span className="font-mono text-[9px] text-[var(--muted)]">CLEAN</span>
-        <span className="font-mono text-[9px] text-[var(--muted)]">MALICIOUS</span>
-      </div>
     </div>
   );
 }
