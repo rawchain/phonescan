@@ -5,128 +5,102 @@ interface RevlLogoProps {
   className?: string;
 }
 
+/**
+ * REVL demon mark — tribal oni/devil face, outline-only line art.
+ * Hero element: two bold crescent horns. Wide shield face, pointed chin,
+ * sharp ear spikes, narrow slanted eyes, long nose, wide jagged grin.
+ * Rendered with red/blue chromatic-aberration glitch layers + green eyes.
+ */
 export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) {
   const id = `rl${size}`;
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // All paths in 200×200 user-space.
-  // Design: wide oni/demon face — prominent curved horns, massive cheekbones,
-  // narrow slanted eyes, long nose bridge → nostrils, wide sinister grin.
-  // Chromatic aberration: red layer at −3px, blue at +3px, both 0.4 opacity.
-  // Main layer: #eeffee with feGaussianBlur glow. Eyes: #00ff41, stronger glow.
-  // ─────────────────────────────────────────────────────────────────────────
-
+  // All paths in a 200×200 user-space.
   const bodyPaths: Array<{ d: string; sw: number }> = [
 
-    // ── Face / skull silhouette ──────────────────────────────────────────
-    // Starts at left horn base, sweeps down to wide cheekbones with small
-    // ear spikes, narrows to angular jaw, comes back up mirrored, closes
-    // across narrow forehead.
+    // ── Face / skull silhouette (shield shape, pointed chin) ─────────────
     {
-      d: `M 65,36
-          C 50,46 36,60 25,78
-          L 10,88
-          L 25,98
-          C 22,118 30,142 50,160
-          L 76,174 L 100,179 L 124,174 L 150,160
-          C 170,142 178,118 175,98
-          L 190,88
-          L 175,78
-          C 164,60 150,46 135,36
-          C 120,26 80,26 65,36
+      d: `M 84,56
+          C 92,50 108,50 116,56
+          C 136,60 150,73 159,89
+          L 184,95
+          L 161,106
+          C 167,128 155,151 133,167
+          C 121,177 110,183 100,185
+          C 90,183 79,177 67,167
+          C 45,151 33,128 39,106
+          L 16,95
+          L 39,89
+          C 48,73 64,60 84,56
           Z`,
-      sw: 2.0,
+      sw: 2.2,
     },
 
-    // ── Left horn — curved crescent blade ────────────────────────────────
-    // Outer edge sweeps up-left to sharp tip; inner edge returns along a
-    // tighter curve. Base shares the face outline start point (65,36).
+    // ── Left horn — bold thick crescent sweeping up & out to a sharp tip ─
     {
-      d: `M 65,36
-          C 55,20 40,8 24,4
-          C 30,14 50,26 68,42
+      d: `M 60,64
+          C 46,52 36,34 36,14
+          C 44,32 62,46 84,56
           Z`,
-      sw: 2.0,
+      sw: 2.4,
     },
 
     // ── Right horn (mirror) ───────────────────────────────────────────────
     {
-      d: `M 135,36
-          C 145,20 160,8 176,4
-          C 170,14 150,26 132,42
+      d: `M 140,64
+          C 154,52 164,34 164,14
+          C 156,32 138,46 116,56
           Z`,
-      sw: 2.0,
+      sw: 2.4,
     },
 
-    // ── Left horn inner-face detail line ─────────────────────────────────
-    // Traces the concave inner face of the horn, implying thickness/depth.
-    { d: `M 70,42 C 62,28 48,16 32,10`, sw: 1.1 },
+    // ── Horn inner ridge lines (depth) ───────────────────────────────────
+    { d: `M 64,60 C 50,48 42,32 40,16`, sw: 1.1 },
+    { d: `M 136,60 C 150,48 158,32 160,16`, sw: 1.1 },
 
-    // ── Right horn inner-face detail line ────────────────────────────────
-    { d: `M 130,42 C 138,28 152,16 168,10`, sw: 1.1 },
+    // ── Heavy brow ridges — steep angry V toward the nose ────────────────
+    { d: `M 44,100 L 95,115`, sw: 2.4 },
+    { d: `M 156,100 L 105,115`, sw: 2.4 },
 
-    // ── Left brow ridge — heavy, slopes DOWN sharply toward nose bridge ──
-    // Inner corner is lower (angry V-shape with right brow).
-    { d: `M 26,90 L 92,103`, sw: 2.2 },
+    // ── Forehead furrow between the brows ────────────────────────────────
+    { d: `M 97,101 L 100,113 L 103,101`, sw: 1.0 },
 
-    // ── Right brow ridge ─────────────────────────────────────────────────
-    { d: `M 174,90 L 108,103`, sw: 2.2 },
+    // ── Long nose bridge → nostril shelf + curls ─────────────────────────
+    { d: `M 96,113 L 89,150`, sw: 1.4 },
+    { d: `M 104,113 L 111,150`, sw: 1.4 },
+    { d: `M 89,150 C 94,158 106,158 111,150`, sw: 1.4 },
+    { d: `M 89,150 C 83,153 84,159 90,158`, sw: 1.1 },
+    { d: `M 111,150 C 117,153 116,159 110,158`, sw: 1.1 },
 
-    // ── Left inner brow accent (short downward flick near nose) ──────────
-    { d: `M 84,101 L 90,110`, sw: 1.1 },
+    // ── Angular cheekbone slashes ────────────────────────────────────────
+    { d: `M 41,106 L 60,150`, sw: 1.2 },
+    { d: `M 159,106 L 140,150`, sw: 1.2 },
 
-    // ── Right inner brow accent ───────────────────────────────────────────
-    { d: `M 116,101 L 110,110`, sw: 1.1 },
+    // ── Sinister smile creases (corners curl up toward cheeks) ───────────
+    { d: `M 52,152 C 58,142 64,138 73,137`, sw: 1.3 },
+    { d: `M 148,152 C 142,142 136,138 127,137`, sw: 1.3 },
 
-    // ── Nose bridge — two diverging lines running from between brows
-    //    all the way down to the nostril shelf ─────────────────────────────
-    { d: `M 96,102 L 90,140`, sw: 1.3 },
-    { d: `M 104,102 L 110,140`, sw: 1.3 },
+    // ── Wide grin — upper lip + lower jaw arcs ────────────────────────────
+    { d: `M 52,152 C 74,160 126,160 148,152`, sw: 2.0 },
+    { d: `M 52,152 C 74,181 126,181 148,152`, sw: 2.0 },
 
-    // ── Nostrils — curved shelf connecting bridge bases ───────────────────
-    { d: `M 90,140 C 94,148 106,148 110,140`, sw: 1.3 },
-
-    // ── Upper lip — wide arc, peaks at centre ────────────────────────────
-    { d: `M 38,152 C 68,141 132,141 162,152`, sw: 1.8 },
-
-    // ── Lower lip / jaw — deep swooping arc ──────────────────────────────
-    { d: `M 38,152 C 68,175 132,175 162,152`, sw: 1.8 },
-
-    // ── Teeth — sharp triangular zigzag (7 teeth) ────────────────────────
-    // Peaks ride just below upper lip; tips plunge toward lower lip.
+    // ── Sharp interlocking teeth ──────────────────────────────────────────
     {
-      d: `M 56,150
-          L 64,167 L 72,150
-          L 80,167 L 88,150
-          L 96,167 L 104,150
-          L 112,167 L 120,150
-          L 128,167 L 136,150
-          L 144,167 L 150,155`,
-      sw: 1.3,
+      d: `M 58,156 L 66,170 L 74,156 L 82,170 L 90,156
+          L 98,170 L 106,156 L 114,170 L 122,156
+          L 130,170 L 138,156 L 144,166`,
+      sw: 1.4,
     },
 
-    // ── Left cheekbone structure line ────────────────────────────────────
-    // Diagonal slash from below ear spike, through broad cheek, to jaw.
-    { d: `M 26,100 L 46,144`, sw: 1.1 },
-
-    // ── Right cheekbone structure line ───────────────────────────────────
-    { d: `M 174,100 L 154,144`, sw: 1.1 },
-
-    // ── Chin angular detail ───────────────────────────────────────────────
-    { d: `M 78,167 L 90,174 L 100,177 L 110,174 L 122,167`, sw: 1.1 },
-
-    // ── Upper face centre crease (between brows, forehead) ───────────────
-    { d: `M 97,58 L 100,70 L 103,58`, sw: 1.0 },
+    // ── Chin crease ───────────────────────────────────────────────────────
+    { d: `M 86,176 L 100,184 L 114,176`, sw: 1.1 },
   ];
 
+  // Eyes — rendered separately in matrix green with a stronger glow + pulse.
   const eyePaths: Array<{ d: string; sw: number }> = [
-    // ── Left eye — narrow angular almond slit ────────────────────────────
-    // Outer corner (left) sits LOWER; inner corner (right, near nose) is
-    // HIGHER. This strong upward slant toward the nose reads as menacing.
-    { d: `M 30,113 L 52,105 L 90,103 L 88,113 L 52,119 Z`, sw: 1.8 },
-
-    // ── Right eye (mirror) ────────────────────────────────────────────────
-    { d: `M 170,113 L 148,105 L 110,103 L 112,113 L 148,119 Z`, sw: 1.8 },
+    // Left — narrow angular almond, slanted toward the nose (menacing)
+    { d: `M 40,117 L 64,110 L 88,118 L 64,122 Z`, sw: 2.0 },
+    // Right (mirror)
+    { d: `M 160,117 L 136,110 L 112,118 L 136,122 Z`, sw: 2.0 },
   ];
 
   const allPaths = [...bodyPaths, ...eyePaths];
@@ -142,7 +116,7 @@ export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) 
       aria-label="REVL"
     >
       <defs>
-        {/* Subtle green glow around main strokes */}
+        {/* Subtle green glow around the main strokes */}
         <filter id={`${id}-g`} x="-30%" y="-30%" width="160%" height="160%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
           <feMerge>
@@ -161,7 +135,6 @@ export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) 
         </filter>
 
         <style>{`
-          /* Glitch burst every 4 seconds — red layer */
           @keyframes ${id}R {
             0%,90%,100% { transform:translate(-3px,0);    opacity:.4;  }
             91%          { transform:translate(-7px, 2px); opacity:.7;  }
@@ -169,7 +142,6 @@ export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) 
             93%          { transform:translate(-5px, 1px); opacity:.55; }
             94%,95%,96%,97%,98%,99% { transform:translate(-3px,0); opacity:.4; }
           }
-          /* Glitch burst — blue layer (opposite phase) */
           @keyframes ${id}B {
             0%,90%,100% { transform:translate(3px,0);    opacity:.4;  }
             91%          { transform:translate(7px,-2px); opacity:.7;  }
@@ -177,7 +149,6 @@ export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) 
             93%          { transform:translate(5px,-1px); opacity:.55; }
             94%,95%,96%,97%,98%,99% { transform:translate(3px,0); opacity:.4; }
           }
-          /* Eye idle pulse — 0.75 → 1.0 opacity */
           @keyframes ${id}E {
             0%,100% { opacity:.75; }
             50%      { opacity:1;   }
@@ -191,57 +162,24 @@ export default function RevlLogo({ size = 200, className = "" }: RevlLogoProps) 
       {/* Pure black background */}
       <rect width="200" height="200" fill="#000" />
 
-      {/* ── Red chromatic aberration layer ──────────────────────────────── */}
-      <g
-        stroke="#ff0000"
-        fill="none"
-        className={`${id}R`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {allPaths.map((p, i) => (
-          <path key={i} d={p.d} strokeWidth={p.sw} />
-        ))}
+      {/* Red chromatic-aberration layer */}
+      <g stroke="#ff0000" fill="none" className={`${id}R`} strokeLinecap="round" strokeLinejoin="round">
+        {allPaths.map((p, i) => <path key={i} d={p.d} strokeWidth={p.sw} />)}
       </g>
 
-      {/* ── Blue chromatic aberration layer ─────────────────────────────── */}
-      <g
-        stroke="#0000ff"
-        fill="none"
-        className={`${id}B`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {allPaths.map((p, i) => (
-          <path key={i} d={p.d} strokeWidth={p.sw} />
-        ))}
+      {/* Blue chromatic-aberration layer */}
+      <g stroke="#0000ff" fill="none" className={`${id}B`} strokeLinecap="round" strokeLinejoin="round">
+        {allPaths.map((p, i) => <path key={i} d={p.d} strokeWidth={p.sw} />)}
       </g>
 
-      {/* ── Main near-white / green-tinted stroke layer ──────────────────── */}
-      <g
-        stroke="#edfff0"
-        fill="none"
-        filter={`url(#${id}-g)`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {bodyPaths.map((p, i) => (
-          <path key={i} d={p.d} strokeWidth={p.sw} />
-        ))}
+      {/* Main near-white / green-tinted stroke layer */}
+      <g stroke="#edfff0" fill="none" filter={`url(#${id}-g)`} strokeLinecap="round" strokeLinejoin="round">
+        {bodyPaths.map((p, i) => <path key={i} d={p.d} strokeWidth={p.sw} />)}
       </g>
 
-      {/* ── Eyes — matrix green, strong glow, slow pulse ─────────────────── */}
-      <g
-        stroke="#00ff41"
-        fill="none"
-        filter={`url(#${id}-eg)`}
-        className={`${id}E`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {eyePaths.map((p, i) => (
-          <path key={i} d={p.d} strokeWidth={p.sw} />
-        ))}
+      {/* Eyes — matrix green, strong glow, slow pulse */}
+      <g stroke="#00ff41" fill="none" filter={`url(#${id}-eg)`} className={`${id}E`} strokeLinecap="round" strokeLinejoin="round">
+        {eyePaths.map((p, i) => <path key={i} d={p.d} strokeWidth={p.sw} />)}
       </g>
     </svg>
   );
