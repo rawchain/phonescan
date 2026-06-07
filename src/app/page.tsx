@@ -2119,7 +2119,7 @@ export default function Home() {
       {/* Header */}
       <header className="text-center mb-4 sm:mb-8 w-full max-w-[700px]">
         <div className="flex justify-center mb-3">
-          <RevlLogo size={80} />
+          <RevlLogo size={120} />
         </div>
         <div className="font-mono text-[10px] tracking-[4px] sm:tracking-[6px] text-[var(--accent)] opacity-70 mb-1.5">
           {"// REVL //"}

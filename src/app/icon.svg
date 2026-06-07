@@ -1,77 +1,67 @@
-<svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="2.5" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    <filter id="g" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="eye-glow" x="-80%" y="-80%" width="360%" height="360%">
-      <feGaussianBlur stdDeviation="2" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    <filter id="eg" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>
 
-  <!-- Background -->
-  <rect width="64" height="64" fill="#000"/>
+  <rect width="200" height="200" fill="#000"/>
 
-  <!-- Matrix fragments -->
-  <text x="2"  y="10" font-family="monospace" font-size="5" fill="#003300" opacity="0.9">1</text>
-  <text x="2"  y="17" font-family="monospace" font-size="5" fill="#00ff41" opacity="0.5">0</text>
-  <text x="56" y="8"  font-family="monospace" font-size="5" fill="#00ff41" opacity="0.4">ウ</text>
-  <text x="56" y="15" font-family="monospace" font-size="5" fill="#003300" opacity="0.8">1</text>
+  <!-- Red chromatic aberration -->
+  <g stroke="#ff0000" fill="none" opacity="0.4" transform="translate(-2,0)">
+    <path d="M 72,40 C 52,52 36,72 28,98 L 12,104 L 28,112 C 30,136 40,160 56,175 L 78,188 L 100,193 L 122,188 L 144,175 C 160,160 170,136 172,112 L 188,104 L 172,98 C 164,72 148,52 128,40 L 100,30 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 74,42 C 62,26 40,12 15,5 C 24,18 50,30 72,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 126,42 C 138,26 160,12 185,5 C 176,18 150,30 128,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 44,76 L 90,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 156,76 L 110,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 46,92 L 60,82 L 90,79 L 88,88 L 58,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 154,92 L 140,82 L 110,79 L 112,88 L 142,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 96,106 L 100,120 L 104,106" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M 46,155 C 72,144 128,144 154,155" stroke-width="1.5"/>
+    <path d="M 46,155 C 72,184 128,184 154,155" stroke-width="1.5"/>
+    <path d="M 64,151 L 70,169 L 76,151 L 82,169 L 88,151 L 94,169 L 100,151 L 106,169 L 112,151 L 118,169 L 124,151 L 130,169 L 136,151" stroke-width="1.2" stroke-linejoin="round"/>
+  </g>
 
-  <!-- Skull shape -->
-  <polygon points="12,52 10,38 13,22 20,13 32,10 44,13 51,22 54,38 52,52 44,56 32,58 20,56"
-    fill="#0a0a0a" stroke="#00ff41" stroke-width="0.8" opacity="0.95" filter="url(#glow)"/>
+  <!-- Blue chromatic aberration -->
+  <g stroke="#0000ff" fill="none" opacity="0.4" transform="translate(2,0)">
+    <path d="M 72,40 C 52,52 36,72 28,98 L 12,104 L 28,112 C 30,136 40,160 56,175 L 78,188 L 100,193 L 122,188 L 144,175 C 160,160 170,136 172,112 L 188,104 L 172,98 C 164,72 148,52 128,40 L 100,30 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 74,42 C 62,26 40,12 15,5 C 24,18 50,30 72,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 126,42 C 138,26 160,12 185,5 C 176,18 150,30 128,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 44,76 L 90,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 156,76 L 110,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 46,92 L 60,82 L 90,79 L 88,88 L 58,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 154,92 L 140,82 L 110,79 L 112,88 L 142,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 96,106 L 100,120 L 104,106" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M 46,155 C 72,144 128,144 154,155" stroke-width="1.5"/>
+    <path d="M 46,155 C 72,184 128,184 154,155" stroke-width="1.5"/>
+    <path d="M 64,151 L 70,169 L 76,151 L 82,169 L 88,151 L 94,169 L 100,151 L 106,169 L 112,151 L 118,169 L 124,151 L 130,169 L 136,151" stroke-width="1.2" stroke-linejoin="round"/>
+  </g>
 
-  <!-- Cheekbones -->
-  <polyline points="12,38 16,34 14,42" fill="none" stroke="#00ff41" stroke-width="0.6" opacity="0.6"/>
-  <polyline points="52,38 48,34 50,42" fill="none" stroke="#00ff41" stroke-width="0.6" opacity="0.6"/>
+  <!-- Main white/green body layer -->
+  <g stroke="#e0ffe8" fill="none" filter="url(#g)">
+    <path d="M 72,40 C 52,52 36,72 28,98 L 12,104 L 28,112 C 30,136 40,160 56,175 L 78,188 L 100,193 L 122,188 L 144,175 C 160,160 170,136 172,112 L 188,104 L 172,98 C 164,72 148,52 128,40 L 100,30 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 74,42 C 62,26 40,12 15,5 C 24,18 50,30 72,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 126,42 C 138,26 160,12 185,5 C 176,18 150,30 128,46 Z" stroke-width="1.5" stroke-linejoin="round"/>
+    <path d="M 44,76 L 90,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 156,76 L 110,67" stroke-width="2.0" stroke-linecap="round"/>
+    <path d="M 96,106 L 100,120 L 104,106" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M 46,155 C 72,144 128,144 154,155" stroke-width="1.5"/>
+    <path d="M 46,155 C 72,184 128,184 154,155" stroke-width="1.5"/>
+    <path d="M 64,151 L 70,169 L 76,151 L 82,169 L 88,151 L 94,169 L 100,151 L 106,169 L 112,151 L 118,169 L 124,151 L 130,169 L 136,151" stroke-width="1.2" stroke-linejoin="round"/>
+    <path d="M 34,115 L 56,142" stroke-width="1.0"/>
+    <path d="M 166,115 L 144,142" stroke-width="1.0"/>
+    <path d="M 95,52 L 100,64 L 105,52" stroke-width="1.0" stroke-linejoin="round"/>
+    <path d="M 85,183 L 100,192 L 115,183" stroke-width="1.0" stroke-linejoin="round"/>
+  </g>
 
-  <!-- Forehead hex -->
-  <polygon points="32,12 37,15 37,21 32,24 27,21 27,15" fill="none" stroke="#003300" stroke-width="0.7" opacity="0.9"/>
-  <circle cx="32" cy="18" r="1" fill="#003300" opacity="0.9"/>
-  <line x1="27" y1="18" x2="22" y2="18" stroke="#003300" stroke-width="0.5" opacity="0.8"/>
-  <line x1="37" y1="18" x2="42" y2="18" stroke="#003300" stroke-width="0.5" opacity="0.8"/>
-
-  <!-- Left eye socket -->
-  <polygon points="17,32 22,27 27,32 22,37" fill="#000" stroke="#00ff41" stroke-width="0.9"/>
-  <polygon points="18.5,32 22,28.5 25.5,32 22,35.5" fill="#001800"/>
-  <rect x="19.5" y="30" width="5" height="4" rx="0.3" fill="#00ff41" filter="url(#eye-glow)"/>
-  <line x1="20" y1="32" x2="24" y2="32" stroke="#ffffff" stroke-width="0.5" opacity="0.8"/>
-
-  <!-- Right eye socket -->
-  <polygon points="37,32 42,27 47,32 42,37" fill="#000" stroke="#00ff41" stroke-width="0.9"/>
-  <polygon points="38.5,32 42,28.5 45.5,32 42,35.5" fill="#001800"/>
-  <rect x="39.5" y="30" width="5" height="4" rx="0.3" fill="#00ff41" filter="url(#eye-glow)"/>
-  <line x1="40" y1="32" x2="44" y2="32" stroke="#ffffff" stroke-width="0.5" opacity="0.8"/>
-
-  <!-- Nose bridge -->
-  <polyline points="30,37 32,40 34,37" fill="none" stroke="#00ff41" stroke-width="0.6" opacity="0.5"/>
-
-  <!-- Grimace mouth -->
-  <polyline points="20,47 24,44 28,46 32,44 36,46 40,44 44,47"
-    fill="none" stroke="#00ff41" stroke-width="0.9" opacity="0.85"/>
-  <line x1="24" y1="44" x2="24" y2="47" stroke="#00ff41" stroke-width="0.7" opacity="0.5"/>
-  <line x1="28" y1="44" x2="28" y2="46.5" stroke="#00ff41" stroke-width="0.7" opacity="0.5"/>
-  <line x1="32" y1="44" x2="32" y2="47" stroke="#00ff41" stroke-width="0.7" opacity="0.5"/>
-  <line x1="36" y1="44" x2="36" y2="46.5" stroke="#00ff41" stroke-width="0.7" opacity="0.5"/>
-  <line x1="40" y1="44" x2="40" y2="47" stroke="#00ff41" stroke-width="0.7" opacity="0.5"/>
-
-  <!-- Scan lines -->
-  <line x1="10" y1="14" x2="54" y2="14" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="18" x2="54" y2="18" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="22" x2="54" y2="22" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="26" x2="54" y2="26" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="30" x2="54" y2="30" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="34" x2="54" y2="34" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="38" x2="54" y2="38" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="42" x2="54" y2="42" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="46" x2="54" y2="46" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-  <line x1="10" y1="50" x2="54" y2="50" stroke="#00ff41" stroke-width="0.4" opacity="0.06"/>
-
-  <!-- Corner brackets -->
-  <polyline points="2,8 2,2 8,2"     fill="none" stroke="#00ff41" stroke-width="0.8" opacity="0.5"/>
-  <polyline points="56,2 62,2 62,8"  fill="none" stroke="#00ff41" stroke-width="0.8" opacity="0.5"/>
-  <polyline points="2,56 2,62 8,62"  fill="none" stroke="#00ff41" stroke-width="0.8" opacity="0.5"/>
-  <polyline points="62,56 62,62 56,62" fill="none" stroke="#00ff41" stroke-width="0.8" opacity="0.5"/>
+  <!-- Eyes — matrix green glow -->
+  <g stroke="#00ff41" fill="none" filter="url(#eg)">
+    <path d="M 46,92 L 60,82 L 90,79 L 88,88 L 58,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+    <path d="M 154,92 L 140,82 L 110,79 L 112,88 L 142,91 Z" stroke-width="1.6" stroke-linejoin="round"/>
+  </g>
 </svg>
