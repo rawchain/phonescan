@@ -169,9 +169,9 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 function InfoCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
-      <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mb-1.5 uppercase">{label}</div>
-      <div className="font-head font-semibold text-[15px] text-white truncate leading-tight" title={value}>{value}</div>
+    <div className="bg-[#070910] border border-[var(--border)] rounded-sm px-3 py-2.5 overflow-hidden">
+      <div className="font-mono text-[9px] tracking-[2px] text-[var(--muted)] mb-1 uppercase">{label}</div>
+      <div className="font-head font-semibold text-[13px] sm:text-[15px] text-white truncate leading-tight" title={value}>{value}</div>
     </div>
   );
 }
@@ -244,7 +244,7 @@ function AnalysisExpander({ text }: { text: string }) {
     <div className="border border-[var(--border)] rounded-sm overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 bg-[#070910] hover:bg-[#0d1117] transition-colors text-left"
+        className="w-full flex items-center justify-between px-3 sm:px-4 py-3 bg-[#070910] hover:bg-[#0d1117] active:bg-[#0d1117] transition-colors text-left"
       >
         <span className="font-mono text-[11px] tracking-[2px] text-[var(--accent)] flex items-center gap-2">
           <span className={`transition-transform duration-300 inline-block ${open ? "rotate-90" : ""}`}>▶</span>
@@ -524,7 +524,7 @@ function ResultCard({ result }: { result: LookupResult }) {
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)]">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
@@ -540,7 +540,7 @@ function ResultCard({ result }: { result: LookupResult }) {
                 </span>
               )}
             </div>
-            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{displayNum}</div>
+            <div className="font-mono text-base sm:text-xl tracking-[1px] sm:tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{displayNum}</div>
             {/* Carrier + VOIP badge */}
             {carrier && (
               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -569,14 +569,14 @@ function ResultCard({ result }: { result: LookupResult }) {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"     getText={getReport} />
-            <CopyBtn label="🔗 LINK"  getText={getShare}  />
+          <div className="flex items-center gap-1.5 shrink-0 mt-1">
+            <CopyBtn label="COPY"    getText={getReport} />
+            <CopyBtn label="🔗"      getText={getShare}  />
           </div>
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
         {/* Invalid number banner */}
         {isInvalid && (
           <div className="flex items-center gap-3 px-4 py-3 border border-[rgba(255,60,90,0.4)] bg-[rgba(255,60,90,0.08)] rounded-sm">
@@ -591,11 +591,11 @@ function ResultCard({ result }: { result: LookupResult }) {
         )}
 
         {/* Risk banner */}
-        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
-          <span className="text-3xl leading-none">{rc.icon}</span>
-          <div>
-            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
-            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+        <div className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-2xl sm:text-3xl leading-none shrink-0">{rc.icon}</span>
+          <div className="min-w-0">
+            <div className={`font-head font-bold text-lg sm:text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[13px] sm:text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
           </div>
         </div>
 
@@ -669,7 +669,7 @@ function ResultCard({ result }: { result: LookupResult }) {
         )}
 
         {/* Meta grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {metaItems.map(({ label, value }) =>
             label === "LOCAL TIME" && localTime ? (
               <div key="LOCAL TIME" className="bg-[#070910] border border-[var(--border)] rounded-sm px-3.5 py-3 overflow-hidden">
@@ -787,7 +787,7 @@ function AbuseReports({ reports }: { reports: AbuseReport[] }) {
           const dateStr = date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
           const flag = flagEmoji(r.reporterCountryCode);
           return (
-            <div key={i} className="px-4 py-3 bg-[#070910] space-y-2">
+            <div key={i} className="px-3 sm:px-4 py-2.5 bg-[#070910] space-y-1.5">
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-mono text-[10px] text-[var(--muted)]">{dateStr}</span>
                 <span className="text-sm leading-none">{flag}</span>
@@ -826,7 +826,7 @@ function AbuseReports({ reports }: { reports: AbuseReport[] }) {
 function IndicatorPill({ label, active, colour }: { label: string; active: boolean; colour: string }) {
   return (
     <div
-      className={`font-mono text-[10px] tracking-[2px] px-3 py-1.5 border rounded-sm transition-all ${active ? "" : "opacity-25"}`}
+      className={`font-mono text-[9px] sm:text-[10px] tracking-[1px] sm:tracking-[2px] px-2.5 sm:px-3 py-1.5 border rounded-sm transition-all ${active ? "" : "opacity-25"}`}
       style={active
         ? { borderColor: `${colour}55`, background: `${colour}12`, color: colour }
         : { borderColor: "var(--border)", color: "var(--muted)" }}
@@ -893,7 +893,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)]">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
@@ -902,7 +902,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
                 ip-api · ipapi.is · abuseipdb · greynoise · groq
               </span>
             </div>
-            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{result.ip}</div>
+            <div className="font-mono text-base sm:text-xl tracking-[1px] sm:tracking-[2px] break-all" style={{ color: "var(--accent)" }}>{result.ip}</div>
             {result.original_input !== result.resolved_ip && (
               <div className="font-mono text-[11px] text-[var(--accent)] opacity-70 mt-0.5">
                 ↳ resolved from {result.original_input}
@@ -915,21 +915,21 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
             )}
             <div className="font-mono text-[12px] text-[var(--muted)] mt-1">{flag} {locationStr}</div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"     getText={getReport} />
-            <CopyBtn label="🔗 LINK"  getText={getShare}  />
+          <div className="flex items-center gap-1.5 shrink-0 mt-1">
+            <CopyBtn label="COPY"    getText={getReport} />
+            <CopyBtn label="🔗"      getText={getShare}  />
           </div>
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
 
         {/* Risk banner */}
-        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
-          <span className="text-3xl leading-none">{rc.icon}</span>
-          <div>
-            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
-            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+        <div className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-2xl sm:text-3xl leading-none shrink-0">{rc.icon}</span>
+          <div className="min-w-0">
+            <div className={`font-head font-bold text-lg sm:text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[13px] sm:text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
           </div>
         </div>
 
@@ -992,7 +992,7 @@ function IpResultCard({ result }: { result: IpLookupResult }) {
         <AbuseReports reports={result.abuse_reports} />
 
         {/* Info grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
           {metaItems.map(({ label, value }) => (
             <InfoCell key={label} label={label} value={value} />
           ))}
@@ -1112,7 +1112,7 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)]">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
@@ -1121,27 +1121,27 @@ function EmailResultCard({ result }: { result: EmailLookupResult }) {
                 emailrep.io · groq
               </span>
             </div>
-            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
+            <div className="font-mono text-base sm:text-xl tracking-[1px] sm:tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
               {result.email}
             </div>
             <div className="font-mono text-[12px] text-[var(--muted)] mt-0.5">
               {result.domain}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
-            <CopyBtn label="COPY"     getText={getReport} />
-            <CopyBtn label="🔗 LINK"  getText={getShare}  />
+          <div className="flex items-center gap-1.5 shrink-0 mt-1">
+            <CopyBtn label="COPY"    getText={getReport} />
+            <CopyBtn label="🔗"      getText={getShare}  />
           </div>
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
         {/* Risk banner */}
-        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
-          <span className="text-3xl leading-none">{rc.icon}</span>
-          <div>
-            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
-            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+        <div className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-2xl sm:text-3xl leading-none shrink-0">{rc.icon}</span>
+          <div className="min-w-0">
+            <div className={`font-head font-bold text-lg sm:text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[13px] sm:text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
           </div>
         </div>
 
@@ -1313,7 +1313,7 @@ function UsernameResultCard({ result }: { result: UsernameResult }) {
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)]">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
@@ -1322,7 +1322,7 @@ function UsernameResultCard({ result }: { result: UsernameResult }) {
                 {result.checked} platforms · groq
               </span>
             </div>
-            <div className="font-mono text-xl tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
+            <div className="font-mono text-base sm:text-xl tracking-[1px] sm:tracking-[2px] break-all" style={{ color: "var(--accent)" }}>
               @{result.username}
             </div>
             <div className="font-mono text-[12px] text-[var(--muted)] mt-0.5">
@@ -1336,13 +1336,13 @@ function UsernameResultCard({ result }: { result: UsernameResult }) {
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
         {/* Risk banner */}
-        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
-          <span className="text-3xl leading-none">{rc.icon}</span>
-          <div>
-            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
-            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+        <div className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-2xl sm:text-3xl leading-none shrink-0">{rc.icon}</span>
+          <div className="min-w-0">
+            <div className={`font-head font-bold text-lg sm:text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[13px] sm:text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
           </div>
         </div>
 
@@ -1453,7 +1453,7 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
   return (
     <div className="border border-[var(--border)] rounded-sm bg-[var(--surface)] overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-[var(--border)]">
+      <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--border)]">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="font-mono text-[10px] tracking-[3px] text-[var(--muted)] mb-1.5">
@@ -1462,7 +1462,7 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
                 urlhaus · dns · groq
               </span>
             </div>
-            <div className="font-mono text-[14px] tracking-[1px] break-all" style={{ color: "var(--accent)" }}>
+            <div className="font-mono text-[12px] sm:text-[14px] tracking-[0px] sm:tracking-[1px] break-all" style={{ color: "var(--accent)" }}>
               {result.url}
             </div>
             <div className="font-mono text-[11px] text-[var(--muted)] mt-0.5">
@@ -1476,13 +1476,13 @@ function UrlScanResultCard({ result }: { result: UrlScanResult }) {
         </div>
       </div>
 
-      <div className="px-6 py-5 space-y-5">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5">
         {/* Risk banner */}
-        <div className={`flex items-center gap-4 px-5 py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
-          <span className="text-3xl leading-none">{rc.icon}</span>
-          <div>
-            <div className={`font-head font-bold text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
-            <div className="font-head text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
+        <div className={`flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-3 sm:py-4 border rounded-sm ${rc.bg} ${rc.border}`}>
+          <span className="text-2xl sm:text-3xl leading-none shrink-0">{rc.icon}</span>
+          <div className="min-w-0">
+            <div className={`font-head font-bold text-lg sm:text-xl tracking-[2px] ${rc.text}`}>{rc.label}</div>
+            <div className="font-head text-[13px] sm:text-[14px] text-[var(--text)] mt-0.5 leading-snug">{result.summary}</div>
           </div>
         </div>
 
@@ -1741,21 +1741,20 @@ function HistoryPanel({
             <button
               key={i}
               onClick={() => onRestore(entry)}
-              className="w-full flex items-center justify-between px-5 py-2.5 hover:bg-[#0d1117] transition-colors text-left group"
+              className="w-full flex items-center justify-between px-3 sm:px-5 py-3 hover:bg-[#0d1117] active:bg-[#0d1117] transition-colors text-left group"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className="font-mono text-[10px] text-[var(--muted)]">{String(i + 1).padStart(2, "0")}</span>
+              <div className="flex items-center gap-2 min-w-0">
                 <span className="text-sm leading-none shrink-0">{icon}</span>
-                <span className={`font-mono text-[13px] tracking-wide group-hover:text-[var(--accent)] transition-colors truncate ${rc.text}`}>
+                <span className={`font-mono text-[11px] sm:text-[13px] tracking-wide group-hover:text-[var(--accent)] transition-colors truncate ${rc.text}`}>
                   {displayVal}
                 </span>
-                <span className="font-mono text-[10px] text-[var(--muted)] shrink-0">{modeLabel}</span>
+                <span className="font-mono text-[9px] text-[var(--muted)] shrink-0 hidden sm:inline">{modeLabel}</span>
               </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={`font-mono text-[10px] tracking-[2px] px-2 py-0.5 border rounded-sm ${rc.text} ${rc.border}`}>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className={`font-mono text-[9px] tracking-[1px] px-1.5 py-0.5 border rounded-sm ${rc.text} ${rc.border}`}>
                   {entry.risk.toUpperCase()}
                 </span>
-                <span className="font-mono text-[10px] text-[var(--muted)]">{entry.queriedAt}</span>
+                <span className="font-mono text-[9px] text-[var(--muted)] hidden sm:inline">{entry.queriedAt}</span>
               </div>
             </button>
           );
@@ -1800,12 +1799,16 @@ export default function Home() {
       "ァアィイゥウェエォオカガキギクグケゲコゴサザシジスズセゼソゾタダチヂッツヅテデトドナニヌネノ" +
       "ハバパヒビピフブプヘベペホボポマミムメモャヤュユョヨラリルレロワヲン" +
       "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-    const FONT_SIZE = 14;
-    const TRAIL     = 8;
+    const isMobile  = window.innerWidth < 640;
+    const FONT_SIZE = isMobile ? 12 : 14;
+    const TRAIL     = isMobile ? 5 : 8;
 
     let cols: number[]   = [];
     let speeds: number[] = [];
     let animId: number;
+    let lastFrame = 0;
+    const TARGET_FPS = isMobile ? 20 : 30; // cap FPS on mobile to save battery
+    const FRAME_MS   = 1000 / TARGET_FPS;
 
     function resize() {
       canvas.width  = window.innerWidth;
@@ -1818,7 +1821,10 @@ export default function Home() {
     resize();
     window.addEventListener("resize", resize);
 
-    function draw() {
+    function draw(ts: number) {
+      animId = requestAnimationFrame(draw);
+      if (ts - lastFrame < FRAME_MS) return; // throttle
+      lastFrame = ts;
       // Redraw opaque background each frame — no trailing glow buildup
       ctx.fillStyle = "#0a0c0f";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1842,10 +1848,9 @@ export default function Home() {
         }
       }
 
-      animId = requestAnimationFrame(draw);
     }
 
-    draw();
+    animId = requestAnimationFrame(draw);
 
     return () => {
       cancelAnimationFrame(animId);
@@ -2090,13 +2095,13 @@ export default function Home() {
       <div
         style={{
           fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "11px",
+          fontSize: "10px",
           fontWeight: 700,
-          letterSpacing: "0.3em",
+          letterSpacing: "0.15em",
           color: "#00ff41",
           background: "rgba(0,255,65,0.04)",
           borderBottom: "1px solid rgba(0,255,65,0.2)",
-          padding: "6px 0",
+          padding: "5px 8px",
           textAlign: "center",
           width: "100%",
           position: "relative",
@@ -2107,25 +2112,25 @@ export default function Home() {
       </div>
 
       <div
-        className="min-h-screen flex flex-col items-center px-4 py-10"
+        className="min-h-screen flex flex-col items-center px-3 sm:px-4 py-5 sm:py-10"
         style={{ position: "relative", zIndex: 1 }}
       >
       {/* Header */}
-      <header className="text-center mb-8 w-full max-w-[700px]">
-        <div className="font-mono text-[11px] tracking-[6px] text-[var(--accent)] opacity-70 mb-2">
+      <header className="text-center mb-4 sm:mb-8 w-full max-w-[700px]">
+        <div className="font-mono text-[10px] tracking-[4px] sm:tracking-[6px] text-[var(--accent)] opacity-70 mb-1.5">
           {"// PHONESCAN //"}
         </div>
         <h1
           className="font-head font-bold text-white tracking-[2px] leading-none"
-          style={{ fontSize: "clamp(2rem,5vw,3.2rem)" }}
+          style={{ fontSize: "clamp(1.8rem,6vw,3.2rem)" }}
         >
           PHONE <span style={{ color: "var(--accent)", textShadow: "0 0 30px rgba(0,255,136,0.5)" }}>SCAN</span>
         </h1>
-        <div className="font-mono text-[11px] tracking-[3px] text-[var(--muted)] mt-2">
-          AI-POWERED PHONE &amp; IP INTELLIGENCE · POWERED BY GROQ
+        <div className="font-mono text-[9px] sm:text-[11px] tracking-[2px] sm:tracking-[3px] text-[var(--muted)] mt-1.5">
+          AI-POWERED OSINT · PHONE · IP · EMAIL · USERNAME · URL
         </div>
         {remaining !== null && (
-          <div className="font-mono text-[10px] tracking-[2px] text-[var(--muted)] mt-1.5 opacity-60">
+          <div className="font-mono text-[9px] tracking-[2px] text-[var(--muted)] mt-1 opacity-60">
             {remaining} LOOKUPS REMAINING TODAY
           </div>
         )}
@@ -2167,8 +2172,8 @@ export default function Home() {
       <div className="w-full max-w-[700px] border border-[var(--border)] border-t-0 rounded-b-sm bg-[var(--surface)]">
 
         {/* Input section */}
-        <div className="px-8 pt-7 pb-6 border-b border-[var(--border)]">
-          <span className="font-mono text-[11px] tracking-[3px] text-[var(--accent)] block mb-3">
+        <div className="px-4 sm:px-8 pt-5 sm:pt-7 pb-4 sm:pb-6 border-b border-[var(--border)]">
+          <span className="font-mono text-[10px] sm:text-[11px] tracking-[2px] sm:tracking-[3px] text-[var(--accent)] block mb-2.5">
             {mode === "red"      ? "// ENTER IP ADDRESS OR DOMAIN"   :
              mode === "email"    ? "// ENTER EMAIL ADDRESS"          :
              mode === "username" ? "// ENTER USERNAME TO OSINT"      :
@@ -2232,7 +2237,7 @@ export default function Home() {
               )}
             </div>
           ) : (
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <input
               ref={inputRef}
               type={mode === "red" ? "text" : mode === "email" ? "email" : "tel"}
@@ -2240,7 +2245,7 @@ export default function Home() {
               onChange={e => setNumber(e.target.value)}
               placeholder={MODES.find(m => m.id === mode)?.placeholder ?? "+1 555 123 4567"}
               maxLength={mode === "red" ? 45 : 50}
-              className="flex-1 bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[16px] tracking-[2px] text-white px-4 py-3.5 outline-none placeholder:text-[var(--muted)] placeholder:text-[13px] transition-all"
+              className="flex-1 min-w-0 bg-[#070910] border border-[var(--border)] rounded-sm font-mono text-[16px] tracking-[1px] text-white px-3 sm:px-4 py-3 outline-none placeholder:text-[var(--muted)] placeholder:text-[12px] transition-all"
               onFocus={e => {
                 e.currentTarget.style.borderColor = "var(--accent)";
                 e.currentTarget.style.boxShadow   = "0 0 0 1px var(--accent), var(--glow)";
@@ -2253,12 +2258,12 @@ export default function Home() {
             <button
               onClick={() => lookup()}
               disabled={loading || !number.trim()}
-              className="font-head font-bold text-[14px] tracking-[3px] px-6 rounded-sm text-black whitespace-nowrap transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="font-head font-bold text-[13px] sm:text-[14px] tracking-[2px] sm:tracking-[3px] px-4 sm:px-6 py-3 rounded-sm text-black whitespace-nowrap transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               style={{ background: "#00c136" }}
-              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#00e63f"; e.currentTarget.style.boxShadow = "var(--glow)"; e.currentTarget.style.transform = "translateY(-1px)"; }}}
-              onMouseLeave={e => { e.currentTarget.style.background = "#00c136"; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.transform = ""; }}
+              onMouseEnter={e => { if (!e.currentTarget.disabled) { e.currentTarget.style.background = "#00e63f"; e.currentTarget.style.boxShadow = "var(--glow)"; }}}
+              onMouseLeave={e => { e.currentTarget.style.background = "#00c136"; e.currentTarget.style.boxShadow = ""; }}
             >
-              {loading ? "SCANNING..." : "SCAN"}
+              {loading ? "..." : "SCAN"}
             </button>
           </div>
           )}
@@ -2279,13 +2284,13 @@ export default function Home() {
           </div>
 
           {/* Depth selector */}
-          <div className="flex items-center gap-3 mt-4">
-            <span className="font-mono text-[10px] tracking-[2px] text-[var(--muted)]">DEPTH:</span>
+          <div className="flex items-center gap-2 mt-3">
+            <span className="font-mono text-[9px] tracking-[2px] text-[var(--muted)] shrink-0">DEPTH:</span>
             {DEPTHS.map(d => (
               <button
                 key={d.id}
                 onClick={() => setDepth(d.id)}
-                className={`font-mono text-[10px] tracking-[2px] px-3 py-1 border rounded-sm transition-all ${
+                className={`font-mono text-[9px] sm:text-[10px] tracking-[1px] sm:tracking-[2px] px-2.5 sm:px-3 py-1.5 border rounded-sm transition-all ${
                   depth === d.id
                     ? "border-[var(--accent)] text-[var(--accent)]"
                     : "border-[var(--border)] text-[var(--muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
@@ -2387,8 +2392,8 @@ export default function Home() {
             </div>
           )}
 
-          <div className="font-mono text-[11px] text-[var(--muted)] mt-3 opacity-60">
-            AI analysis powered by Groq · llama-3.3-70b-versatile ·{" "}
+          <div className="font-mono text-[9px] sm:text-[10px] text-[var(--muted)] mt-2.5 opacity-60 leading-relaxed">
+            Groq · llama-3.3-70b ·{" "}
             <a href="https://github.com/rawchain" target="_blank" rel="noreferrer"
                className="text-[var(--accent)] opacity-70 hover:opacity-100 transition-opacity">
               github.com/rawchain
@@ -2398,7 +2403,7 @@ export default function Home() {
 
         {/* Loading bar */}
         {loading && (
-          <div className="px-8 py-8 text-center border-b border-[var(--border)]">
+          <div className="px-4 sm:px-8 py-6 sm:py-8 text-center border-b border-[var(--border)]">
             <div className="h-[2px] bg-[var(--border)] rounded-sm overflow-hidden mb-3.5">
               <div
                 className="h-full rounded-sm"
@@ -2424,7 +2429,7 @@ export default function Home() {
 
         {/* Error */}
         {error && !loading && (
-          <div className="mx-8 my-5 px-5 py-4 border border-[rgba(255,60,90,0.3)] bg-[rgba(255,60,90,0.07)] rounded-sm">
+          <div className="mx-3 sm:mx-8 my-4 sm:my-5 px-4 py-3 border border-[rgba(255,60,90,0.3)] bg-[rgba(255,60,90,0.07)] rounded-sm">
             <span className="font-mono text-[12px] tracking-[1px] text-[#ff3c5a] leading-relaxed">⚠ {error}</span>
           </div>
         )}
@@ -2448,7 +2453,7 @@ export default function Home() {
                 zIndex: 10,
               }}
             />
-            <div className="p-6 border-t border-[var(--border)]">
+            <div className="p-3 sm:p-6 border-t border-[var(--border)]">
               {"ip" in result && !("email" in result) && !("parsed" in result) && !("username" in result) && !("url" in result)
                 ? <IpResultCard       result={result as IpLookupResult}       />
                 : "email" in result && !("ip" in result) && !("parsed" in result) && !("username" in result) && !("url" in result)
@@ -2472,8 +2477,11 @@ export default function Home() {
       )}
 
       {/* Footer */}
-      <footer className="mt-7 font-mono text-[11px] tracking-[1px] text-[var(--muted)] text-center opacity-50">
-        We are not responsible for how you use this · {new Date().getFullYear()}
+      <footer
+        className="mt-6 font-mono text-[9px] sm:text-[11px] tracking-[1px] text-[var(--muted)] text-center opacity-50"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        Not responsible for misuse · {new Date().getFullYear()}
       </footer>
       </div>
     </>

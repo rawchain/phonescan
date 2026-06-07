@@ -19,7 +19,15 @@
 
 * { box-sizing: border-box; }
 
-html { background: #0a0c0f; } /* opaque fallback — canvas overpaints at z-index 0 */
+html {
+  background: #0a0c0f;
+  /* Smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  overflow-x: hidden;
+}
+
+/* Prevent layout blowout from wide content */
+body { overflow-x: hidden; }
 
 body {
   background: #0a0c0f;
@@ -61,6 +69,17 @@ body::after {
 ::-webkit-scrollbar       { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,255,65,0.2); border-radius: 2px; }
+
+/* Remove 300ms tap delay on all interactive elements */
+a, button, input, select, textarea, [role="button"] {
+  touch-action: manipulation;
+}
+
+/* Prevent text-size adjustment on orientation change */
+body { -webkit-text-size-adjust: 100%; }
+
+/* Safe area insets for iPhone notch / home indicator */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
 
 @keyframes scan {
   0%   { width: 0%;   margin-left: 0; }
